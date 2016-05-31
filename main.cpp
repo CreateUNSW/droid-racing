@@ -20,8 +20,10 @@ using namespace cv;
 // define camera_t as raspberry pi cv camera class
 typedef raspicam::RaspiCam_Cv camera_t;
 
+void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
 void camera_setup(camera_t & cam);
 uint32_t millis();
+void sleep(double seconds);
 
 int main(int argc, char * argv[])
 {
@@ -62,10 +64,26 @@ int main(int argc, char * argv[])
 
 		// convert image to HSV for processing
 		cvtColor(im, imHSV, COLOR_BGR2HSV);
+
+		// measure HSV colour at the centre of the image, for example
+		//cout << imHSV.at<Vec3b>(imHSV.size().width/2,imHSV.size().height/2) << endl;
+
+		// get list of obstacles
+		detect_obstacles(imHSV(ROI), obstacles);
+		for(auto & el : obstacles){
+			el.x += ROI.x;
+			el.y += ROI.y;
+			rectangle(im, el, Scalar(255,0,0));
+		}
 		
 		// display image on screen
-		//imshow("camera", im);
-		//waitKey(1);
+		imshow("camera", im);
+
+		// allow for images to be displayed on desktop application
+		waitKey(1);
+
+		// clear vector after use
+		obstacles.clear();
 
 		// print out info
 		cout << "Image size: " << im.size() << " Loop time: " << millis() - loopTime << endl;
@@ -73,9 +91,42 @@ int main(int argc, char * argv[])
 	return 0;
 }
 
-void detect_obstacles(Mat & hsv, vector<Rect2i> & obj)
+void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 {
+	Mat mask;
+
+	// generate mask of purple colours
+	inRange(hsv, Scalar(100, 65, 40), Scalar(140, 255, 255), mask);
+
+	// eliminate noise
+	int n = 2;
+	Mat element = getStructuringElement(MORPH_RECT, Size(n*2+1, n*2+1), Point(n, n));
+	morphologyEx(mask, mask, MORPH_OPEN, element);
+
+	// variables for defining objects
+	vector<vector<Point>> contours;
+	vector<Vec4i> hierarchy;
 	
+	// draw convex hulls around detected contours
+	findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );
+	vector<vector<Point>> hull(contours.size());
+	for(size_t i = 0; i < contours.size(); ++i){
+		convexHull( Mat(contours[i]), hull[i], false);
+		drawContours(mask, hull, (int)i, Scalar(255), CV_FILLED);
+	}
+	contours.clear();
+	hierarchy.clear();
+
+	// display mask
+	imshow("mask", mask);
+
+	// get shapes around convex hulls
+	findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );	
+	vector<vector<Point>> contours_poly( contours.size() );
+	for(size_t i = 0; i < contours.size(); ++i){
+		approxPolyDP( Mat(contours[i]), contours_poly[i], 3, true);
+		obj.push_back(boundingRect( Mat(contours_poly[i]) ));
+	}
 }
 
 void camera_setup(camera_t & cam)
@@ -97,11 +148,14 @@ void camera_setup(camera_t & cam)
 	*/
 	
 	// For example
-	//cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
+	cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
 	cam.set(CV_CAP_PROP_FRAME_WIDTH, iw);
 	cam.set(CV_CAP_PROP_FRAME_HEIGHT, ih);
 }
 
+/*
+*	Get current pi millisecond time
+*/
 uint32_t millis()
 {
 	struct timeval current;
@@ -115,4 +169,19 @@ uint32_t millis()
 	mtime = ((seconds) * 1000 + useconds/1000.0) + 0.5;
 
 	return mtime;
+}
+
+/*
+*	Sleep pi for certain amount of time
+*/
+void sleep(double seconds)
+{
+	int wholeSeconds = (int)seconds;
+	double remainderSeconds = seconds - wholeSeconds;
+	long int wholeRemainderNanoseconds = round(remainderSeconds * 1e9);
+
+	struct timespec t, t2;
+	t.tv_sec = wholeSeconds;
+	t.tv_nsec = wholeRemainderNanoseconds;
+	nanosleep(&t, &t2);
 }

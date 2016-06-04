@@ -10,6 +10,9 @@
 // Raspicam CV
 #include <raspicam/raspicam_cv.h>
 
+// GPIO and Arduino-like functions
+#include <wiringPi.h>
+
 // Image width and height constants
 const int iw = 640;
 const int ih = 480;
@@ -151,24 +154,6 @@ void camera_setup(camera_t & cam)
 	cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
 	cam.set(CV_CAP_PROP_FRAME_WIDTH, iw);
 	cam.set(CV_CAP_PROP_FRAME_HEIGHT, ih);
-}
-
-/*
-*	Get current pi millisecond time
-*/
-uint32_t millis()
-{
-	struct timeval current;
-	uint32_t mtime, seconds, useconds;
-
-	gettimeofday(&current, NULL);
-
-	seconds = current.tv_sec;
-	useconds = current.tv_usec;
-
-	mtime = ((seconds) * 1000 + useconds/1000.0) + 0.5;
-
-	return mtime;
 }
 
 /*

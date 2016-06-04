@@ -13,6 +13,9 @@
 // GPIO and Arduino-like functions
 #include <wiringPi.h>
 
+// Our own headers
+#include "MyServo.hpp"
+
 // Image width and height constants
 const int iw = 640;
 const int ih = 480;
@@ -25,7 +28,6 @@ typedef raspicam::RaspiCam_Cv camera_t;
 
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
 void camera_setup(camera_t & cam);
-uint32_t millis();
 void sleep(double seconds);
 
 int main(int argc, char * argv[])
@@ -51,7 +53,10 @@ int main(int argc, char * argv[])
 	if (!cam.isOpened()){
 		return -1;
 	}
-	
+
+	// Initialise servo process - see MyServo.cpp
+	servo_init();
+
 	// Variable for timing
 	uint32_t loopTime;
 

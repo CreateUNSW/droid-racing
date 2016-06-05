@@ -14,7 +14,7 @@
 #include <wiringPi.h>
 
 // Our own headers
-#include "MyServo.hpp"
+#include "DriveControl.hpp"
 
 // Image width and height constants
 const int iw = 640;
@@ -54,8 +54,8 @@ int main(int argc, char * argv[])
 		return -1;
 	}
 
-	// Initialise servo process - see MyServo.cpp
-	servo_init();
+	// Instantiate drive signals
+	DriveControl control;
 
 	// Variable for timing
 	uint32_t loopTime;

@@ -2,10 +2,15 @@
 #include <iostream>
 #include <sstream>
 #include <csignal>
+#include <cassert>
 
 #include "MyServo.hpp"
 
+#define DEBUG_SERVO
+
 using namespace std;
+
+bool servoInitialised = false;
 
 /*
 *	Signal handler only in the case where servo process is started.
@@ -28,8 +33,7 @@ void servo_init()
 	
 	if ( i > 0 ){
 		cout << "Initialising servo process" << endl;
-		// TODO: write constructor/configuration options for executable
-		system("sudo ./servod");
+		system("sudo ./servod --min=1000us --max=2000us");
 
 		// Trap exit behaviour
 		signal(SIGINT, signalHandler);
@@ -37,6 +41,8 @@ void servo_init()
 	} else {
 		cout << "Servos already inititalised" << endl;
 	}
+
+	servoInitialised = true;
 }
 
 /*
@@ -46,18 +52,43 @@ void servo_stop()
 {
 	cout << "Stopping servo process" << endl;
 	system("sudo kill $(pgrep servod)");
+
+	servoInitialised = false;
 }
 
 /*
 *	Write to a servo: needs "servod" running
-*	Inputs: servo number, pulse duration
+*	Inputs: servo number, pulse duration in microseconds
 */
 void servo_write(int index, int val)
 {
-	// TODO: write index and val checks for bad input
+	// Check for servos initialised
+	assert(servoInitialised);
+
+	// Check for bad input
+	assert(val >= 1000 && val <= 2000);
+
+	// Round to the nearest 10us, for './servod'
+	if (val % 10 > 0) {
+		if (val % 10 >= 5){
+			val += 10 - (val % 10);
+		} else {
+			val -= (val % 10);
+		}
+	}
+
+	// Compose system command string
 	stringstream ss;
-	ss << "echo " << index << '=' << val << " > /dev/servoblaster";
+	ss << "echo " << index << '=' << val << "us > /dev/servoblaster";
 	string command = ss.str();
+
+	// Convert to char pointer and send
 	char * cmdPtr = &command[0];
 	system(cmdPtr);
+
+	// Debug output
+	#ifdef DEBUG_SERVO
+	cout << "Writing: " << cmdPtr << endl;
+	#endif
+
 }

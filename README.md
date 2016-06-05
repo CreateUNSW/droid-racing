@@ -9,3 +9,15 @@ Download raspicam OpenCV API with instructions from here https://sourceforge.net
 
 Follow instructions to get a raspberry pi servo controller from here http://cihatkeser.com/servo-control-with-raspberry-pi-in-5-minutes-or-less/ for source.
 Check './servod --help' (compiled from source) for usage.
+
+
+Build Instructions:
+
+Navigate to main directory with Makefile. Type 'make' into terminal and hit enter.
+
+
+Run Instructions:
+
+Navigate to 'bin' directory, type './run.exe' and hit enter.
+
+NOTE: To run with 'servod' not yet running, the system performs a system call as root, and therefore needs to be able to do so without use of a password. Otherwise, the program should be run as the root user.

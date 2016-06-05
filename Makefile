@@ -3,7 +3,10 @@
 CPP_FILES = $(wildcard src/*.cpp)
 
 ## Include directories
-INCL_DIRS = -I./include
+INCL_DIRS = -I./include/
+
+## Executable directories
+EXEC_DIRS = ./bin/
 
 ## Optimisation flag
 SPEC_FLAG=-O2
@@ -17,11 +20,11 @@ LIBS = -ljpeg `pkg-config opencv --cflags --libs` -ldl -lstdc++ -lwiringPi -lras
 all: run
 
 run: $(OBJ_FILES) main.cpp
-	g++ $(SPEC_FLAG) -o run.exe main.cpp $(INCL_DIRS) $(OBJ_FILES) --std=c++11 -g $(LIBS) -pthread
+	g++ $(SPEC_FLAG) -o $(EXEC_DIRS)run.exe main.cpp $(INCL_DIRS) $(OBJ_FILES) --std=c++11 -g $(LIBS) -pthread
 
 src/%.o: src/%.cpp
 	g++ $(SPEC_FLAG) -c -o $@ $< $(INCL_DIRS) --std=c++11 -pthread
 
 
 clean:
-	rm -rf $(OBJ_FILES) run.exe
+	rm -rf $(OBJ_FILES) $(EXEC_DIRS)run.exe

@@ -43,7 +43,7 @@ int main(int argc, char * argv[])
 
 	// Region of interest for scanning
 	// bottom half of image
-	Rect2i ROI = Rect2i(0, ih/2 - 1, iw, ih/2);
+	Rect2i ROI = Rect2i(0, ih/2, iw, ih/2);
 
 	// Initialise camera configuration before opening
 	camera_setup(cam);

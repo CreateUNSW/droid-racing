@@ -141,18 +141,6 @@ int main(int argc, char * argv[])
 		//Mat imSV = (channels[2]/2 + channels[1]/2);
 		//detect_path(imSV(ROI));
 
-		/**COLOUR LINE METHOD 4**/
-		/*Mat imHLS;
-		cvtColor(im, imHLS, COLOR_RGB2HLS);
-		split(imHLS, channels);
-		//detect_path(channels[2](ROI));
-		Mat dHue, dLum, dSat;
-		dHue = 255 - abs(channels[0] - 160);
-		dLum = 255 - 2*abs(channels[1] - 127);
-		dSat = channels[2];
-		Mat imWeird = dSat/2+dLum/2; //dHue/3 + dSat/3 + dLum/3;
-		detect_path(imWeird(ROI));*/
-
 		// saturation
 		//Mat mask;
 		//inRange(imHSV(ROI), Scalar(0, 80, 40), Scalar(255, 255, 255), mask);
@@ -219,30 +207,70 @@ void detect_path(Mat grey)
 	int height = centrePath.size().height;
 	int width = centrePath.size().width;
 	centre = width/2;
-	for(row = centrePath.size().height - 1; row >= 0; --row){
+	int perspectiveDistance;
+
+	double deltaF = 0;
+	double difference = 0;
+
+	bool rightFound, leftFound;
+
+	for(row = height - 1; row >= 0; --row){
+		perspectiveDistance = (height- row) * width / (3 * height);
+
 		leftBorder = centre;
-		while(leftBorder > ((height - row) * width / (3*height)) ){
+		leftFound = false;
+		while(leftBorder > 0){//max(0, centre - (width/2 - perspectiveDistance)) ){
 			leftBorder--;
 			if(edges.at<uchar>(row, leftBorder) > 0){
 			//Vec3b col = hough.at<Vec3b>(row, leftBorder);
 			//if(col[2] > uchar(0)){
+				leftFound = true;
 				break;
 			}
 		}
 		rightBorder = centre;
-		while(rightBorder < width - ((height - row) * width / (3*height)) ){
+		rightFound = false;
+		while(rightBorder < width){//min(width, centre + (width/2 - perspectiveDistance)) ){
 			rightBorder++;
 			if(edges.at<uchar>(row, rightBorder)> 0){
 			//Vec3b col = hough.at<Vec3b>(row, rightBorder);
 			//if(col[2] > uchar(0)){
+				rightFound = true;
 				break;
 			}
 		}
-		centre = (leftBorder + rightBorder)/2;
-		for(int i = centre - 1; i <= centre + 1; ++i){
-			centrePath.at<uchar>(row,i) = uchar(255);
-			grey.at<uchar>(row,i) = uchar(255);
+
+		if(!leftFound){
+			leftBorder = max(0, centre - (width/2 - perspectiveDistance));
 		}
+		if(!rightFound){
+			rightBorder = min(width, centre + (width/2 - perspectiveDistance));
+		}
+	
+		double ff = (double)((leftBorder + rightBorder)/2 - centre);
+		deltaF = ff - deltaF;
+		if(row == height - 1){
+			difference += ff * 0.001;
+		} else {
+			difference += ff * 0.001 + deltaF * 0.015;
+			//difference += deltaF * 0.015;
+		}
+		centre += difference;
+		centre = max(2, centre); centre = min(width-3, centre);
+
+		cout << "perspective distance: " << perspectiveDistance;
+		cout << " left found: " << leftFound << " left border: " << leftBorder;
+		cout << " right found: " << rightFound << " right border: " << rightBorder;
+		cout << "  centre: " << centre << endl;
+
+		int deadCentre = (leftBorder + rightBorder)/2;			
+		for(int i = - 1; i <=  1; ++i){
+			centrePath.at<uchar>(row, centre + i) = uchar(255);
+			grey.at<uchar>(row, centre + i) = uchar(255);
+			centrePath.at<uchar>(row, deadCentre + i) = uchar(100);
+			grey.at<uchar>(row,  deadCentre + i) = uchar(0);
+		}
+		
 	}
 	imshow("Centre path", centrePath);
 

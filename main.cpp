@@ -258,10 +258,10 @@ void detect_path(Mat grey)
 		centre += difference;
 		centre = max(2, centre); centre = min(width-3, centre);
 
-		cout << "perspective distance: " << perspectiveDistance;
-		cout << " left found: " << leftFound << " left border: " << leftBorder;
-		cout << " right found: " << rightFound << " right border: " << rightBorder;
-		cout << "  centre: " << centre << endl;
+		//cout << "perspective distance: " << perspectiveDistance;
+		//cout << " left found: " << leftFound << " left border: " << leftBorder;
+		//cout << " right found: " << rightFound << " right border: " << rightBorder;
+		//cout << "  centre: " << centre << endl;
 
 		int deadCentre = (leftBorder + rightBorder)/2;			
 		for(int i = - 1; i <=  1; ++i){

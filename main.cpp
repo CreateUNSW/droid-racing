@@ -314,7 +314,7 @@ Mat detect_path(Mat grey)
 	}
 	imshow("Centre path", centrePath);
 
-	//imshow("Grey with path superimposed", grey);
+	imshow("Grey with path superimposed", grey);
 
 	return centrePath;
 

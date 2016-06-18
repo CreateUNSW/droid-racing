@@ -203,13 +203,14 @@ void detect_path(Mat grey)
 	imshow("Hough", hough);*/
 
 	Mat centrePath = Mat::zeros(grey.size(), CV_8UC1);
-	int leftBorder, rightBorder, row, centre;
+	int leftBorder, rightBorder, row;
 	int height = centrePath.size().height;
 	int width = centrePath.size().width;
-	centre = width/2;
 	int perspectiveDistance;
 
+	double centre = width/2;
 	double deltaF = 0;
+	double oldF = 0;
 	double difference = 0;
 
 	bool rightFound, leftFound;
@@ -241,34 +242,44 @@ void detect_path(Mat grey)
 		}
 
 		if(!leftFound){
-			leftBorder = max(0, centre - (width/2 - perspectiveDistance));
+			leftBorder = max(0, (int)centre - (width/2 - perspectiveDistance));
 		}
 		if(!rightFound){
-			rightBorder = min(width, centre + (width/2 - perspectiveDistance));
+			rightBorder = min(width, (int)centre + (width/2 - perspectiveDistance));
 		}
-	
-		double ff = (double)((leftBorder + rightBorder)/2 - centre);
-		deltaF = ff - deltaF;
+
+		double deadCentre = (leftBorder + rightBorder)/2;	
+		double ff = deadCentre - centre;
+		deltaF = ff - oldF;
+		deltaF = max(deltaF, -5.0); deltaF = min(deltaF, 5.0);
+
+		cout << "centre: " << centre;
+		cout << " dead centre: " << deadCentre;
+		cout << " ff: " << ff;
+		cout << " deltaF: " << deltaF;
+
 		if(row == height - 1){
-			difference += ff * 0.001;
+			difference += ff * 0.01;
 		} else {
-			difference += ff * 0.001 + deltaF * 0.015;
-			//difference += deltaF * 0.015;
+			difference += ff * 0.01 + deltaF * 0.1;
 		}
 		centre += difference;
-		centre = max(2, centre); centre = min(width-3, centre);
+		centre = max(2.0, centre); centre = min(width-3.0, centre);
+		oldF = ff;
 
+		cout << " difference: " << difference;
+		cout << " new centre: " << centre << endl;
 		//cout << "perspective distance: " << perspectiveDistance;
 		//cout << " left found: " << leftFound << " left border: " << leftBorder;
 		//cout << " right found: " << rightFound << " right border: " << rightBorder;
 		//cout << "  centre: " << centre << endl;
 
-		int deadCentre = (leftBorder + rightBorder)/2;			
+				
 		for(int i = - 1; i <=  1; ++i){
-			centrePath.at<uchar>(row, centre + i) = uchar(255);
-			grey.at<uchar>(row, centre + i) = uchar(255);
-			centrePath.at<uchar>(row, deadCentre + i) = uchar(100);
-			grey.at<uchar>(row,  deadCentre + i) = uchar(0);
+			centrePath.at<uchar>(row, (int)deadCentre + i) = uchar(100);
+			grey.at<uchar>(row,  (int)deadCentre + i) = uchar(0);
+			centrePath.at<uchar>(row, (int)centre + i) = uchar(255);
+			grey.at<uchar>(row, (int)centre + i) = uchar(255);
 		}
 		
 	}

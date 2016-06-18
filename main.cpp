@@ -41,7 +41,7 @@ static string image_path = "/home/pi/droid-racing/sample_images/";
 	typedef VideoCapture camera_t;
 #endif
 
-void detect_path(Mat grey);
+Mat detect_path(Mat grey);
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
 void camera_setup(camera_t & cam);
 void sleep(double seconds);
@@ -49,7 +49,7 @@ void sleep(double seconds);
 int main(int argc, char * argv[])
 {	
 	// Mat variables for storage of images
-	Mat im, imHSV, imGrey, imLarge;
+	Mat im, imHSV, imGrey, imLarge, binaryPath;
 
 	// Image channels for better analysis
 	vector<Mat> channels(3);
@@ -115,6 +115,12 @@ int main(int argc, char * argv[])
 				cout << "Reached end of images" << endl;
 				return 0;
 			}
+
+			// out-file filename for saving
+			filename.clear();
+			filename.str(string());
+			filename << image_path << "out" << imIndex << ".jpg";
+
 			// increment file index
 			imIndex++;
 		#endif
@@ -128,18 +134,18 @@ int main(int argc, char * argv[])
 		/**COLOUR LINE METHOD 1**/		
 		// split HSV channels
 		//split(imHSV, channels);
-		//detect_path(channels[1](ROI));
+		//binaryPath = detect_path(channels[1](ROI));
 
 		/**COLOUR LINE METHOD 2 - THE BEST CURRENTLY**/
 		// convert hsv image to bgr->greyscale for processing
 		cvtColor(imHSV, imGrey, COLOR_BGR2GRAY);
-		detect_path(imGrey(ROI));
+		binaryPath = detect_path(imGrey(ROI));
 
 		/**COLOUR LINE METHOD 3 - SATURATION AND VOLUME**/
 		// combine hue and saturation into new image
 		//split(imHSV, channels);
 		//Mat imSV = (channels[2]/2 + channels[1]/2);
-		//detect_path(imSV(ROI));
+		//binaryPath = detect_path(imSV(ROI));
 
 		// saturation
 		//Mat mask;
@@ -148,6 +154,22 @@ int main(int argc, char * argv[])
 		
 		// measure HSV colour at the centre of the image, for example
 		//cout << imHSV.at<Vec3b>(imHSV.size().width/2,imHSV.size().height/2) << endl;
+
+		/**DISPLAY PATH ON TOP OF IMAGE**/
+		Mat imPath = im(ROI).clone();
+		Mat invBinaryPath, threeChannelMask;
+		Mat zeroMask = Mat::zeros(imPath.size(), CV_8UC1);
+		bitwise_not(binaryPath,invBinaryPath);
+
+		Mat pathMasks[] = {invBinaryPath, invBinaryPath, invBinaryPath};
+		merge(pathMasks, 3, threeChannelMask);
+		bitwise_and(imPath, threeChannelMask, imPath);
+
+		Mat redMask[] = {zeroMask, zeroMask, binaryPath};
+		merge(redMask, 3, threeChannelMask);
+		bitwise_or(imPath, threeChannelMask, imPath);
+
+		imshow("path", imPath);
 
 		// get list of obstacles
 		detect_obstacles(imHSV(ROI), obstacles);
@@ -161,10 +183,12 @@ int main(int argc, char * argv[])
 		cout << "Image size: " << im.size() << " Loop time: " << millis() - loopTime << endl;
 
 		// display image on screen
-		imshow("camera", im);
+		//imshow("camera", im);
 
 		// allow for images to be displayed on desktop application
 		#ifdef STILL_IMAGES
+			//cout << "Saving file " << filename.str() << endl;
+			//imwrite(filename.str(), imPath);
 			cout << "Press any key for next image" << endl;
 			// need to be clicked in to one of the image windows (not terminal) for this to work
 			waitKey();
@@ -178,7 +202,7 @@ int main(int argc, char * argv[])
 	return 0;
 }
 
-void detect_path(Mat grey)
+Mat detect_path(Mat grey)
 {
 	imshow("Single channel path frame", grey);
 
@@ -202,45 +226,54 @@ void detect_path(Mat grey)
 	}
 	imshow("Hough", hough);*/
 
+	// Path matrix, which calculated path will be drawn on
 	Mat centrePath = Mat::zeros(grey.size(), CV_8UC1);
+	// Integer variables for features of image
 	int leftBorder, rightBorder, row;
 	int height = centrePath.size().height;
 	int width = centrePath.size().width;
+	// effect of perspective increases for further away objects
 	int perspectiveDistance;
 
+	// doubles for inputs into the PD controller which generates the line
 	double centre = width/2;
 	double deltaF = 0;
 	double oldF = 0;
 	double difference = 0;
 
+	// keeps track of the presence of the left and right edges in each row of any frame
 	bool rightFound, leftFound;
 
+	// iterate from the bottom (droid) edge of the image to the top
 	for(row = height - 1; row >= 0; --row){
+		// calculate horizontal pseudo-effect of perspective 
 		perspectiveDistance = (height- row) * width / (3 * height);
 
+		// start looking for left border from the centre path, iterate outwards
 		leftBorder = centre;
 		leftFound = false;
-		while(leftBorder > 0){//max(0, centre - (width/2 - perspectiveDistance)) ){
+		while(leftBorder > 0){
 			leftBorder--;
 			if(edges.at<uchar>(row, leftBorder) > 0){
-			//Vec3b col = hough.at<Vec3b>(row, leftBorder);
-			//if(col[2] > uchar(0)){
+				// if an edge is found, assume its the border, and break
 				leftFound = true;
 				break;
 			}
 		}
+
+		// start looking for right border from the centre path, iterate outwards
 		rightBorder = centre;
 		rightFound = false;
-		while(rightBorder < width){//min(width, centre + (width/2 - perspectiveDistance)) ){
+		while(rightBorder < width){
 			rightBorder++;
-			if(edges.at<uchar>(row, rightBorder)> 0){
-			//Vec3b col = hough.at<Vec3b>(row, rightBorder);
-			//if(col[2] > uchar(0)){
+			if(edges.at<uchar>(row, rightBorder) > 0){
+				// if an edge is found, assume its the border, and break
 				rightFound = true;
 				break;
 			}
 		}
 
+		// if either border was not found, assume it is a certain distance away from the path based on perspective
 		if(!leftFound){
 			leftBorder = max(0, (int)centre - (width/2 - perspectiveDistance));
 		}
@@ -248,35 +281,31 @@ void detect_path(Mat grey)
 			rightBorder = min(width, (int)centre + (width/2 - perspectiveDistance));
 		}
 
+		// feed calculated centre of the borders into the controller
 		double deadCentre = (leftBorder + rightBorder)/2;	
+		// proportional term
 		double ff = deadCentre - centre;
+		// derivative term
 		deltaF = ff - oldF;
+		// cap derivative term in case of sudden jumps in path
 		deltaF = max(deltaF, -5.0); deltaF = min(deltaF, 5.0);
 
-		cout << "centre: " << centre;
-		cout << " dead centre: " << deadCentre;
-		cout << " ff: " << ff;
-		cout << " deltaF: " << deltaF;
-
+		// feed terms into horizontal rate accross image
 		if(row == height - 1){
 			difference += ff * 0.01;
 		} else {
 			difference += ff * 0.01 + deltaF * 0.1;
 		}
+
+		// adjust centre of path accordingly
 		centre += difference;
+		// bound path by edges of image
 		centre = max(2.0, centre); centre = min(width-3.0, centre);
+		// track past proportional term, used to calculate derivative term
 		oldF = ff;
 
-		cout << " difference: " << difference;
-		cout << " new centre: " << centre << endl;
-		//cout << "perspective distance: " << perspectiveDistance;
-		//cout << " left found: " << leftFound << " left border: " << leftBorder;
-		//cout << " right found: " << rightFound << " right border: " << rightBorder;
-		//cout << "  centre: " << centre << endl;
-
-				
+		// draw path pixels on images
 		for(int i = - 1; i <=  1; ++i){
-			centrePath.at<uchar>(row, (int)deadCentre + i) = uchar(100);
 			grey.at<uchar>(row,  (int)deadCentre + i) = uchar(0);
 			centrePath.at<uchar>(row, (int)centre + i) = uchar(255);
 			grey.at<uchar>(row, (int)centre + i) = uchar(255);
@@ -285,8 +314,9 @@ void detect_path(Mat grey)
 	}
 	imshow("Centre path", centrePath);
 
-	imshow("Grey with path superimposed", grey);
-	
+	//imshow("Grey with path superimposed", grey);
+
+	return centrePath;
 
 	// get approximate contours from binary mask
 	/*vector<vector<Point>> contours;

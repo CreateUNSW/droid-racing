@@ -41,7 +41,7 @@ static string image_path = "/home/pi/droid-racing/sample_images/";
 	typedef VideoCapture camera_t;
 #endif
 
-Mat detect_path(Mat grey);
+void detect_path(Mat grey, float & steeringAngle, float & speed);
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
 void camera_setup(camera_t & cam);
 void sleep(double seconds);
@@ -81,6 +81,8 @@ int main(int argc, char * argv[])
 
 	// Instantiate drive signals
 	//DriveControl control;
+	float steeringAngle;
+	float speed;
 
 	// Variable for timing
 	uint32_t loopTime;
@@ -131,45 +133,13 @@ int main(int argc, char * argv[])
 		// convert image to HSV for processing
 		cvtColor(im, imHSV, COLOR_BGR2HSV);
 
-		/**COLOUR LINE METHOD 1**/		
-		// split HSV channels
-		//split(imHSV, channels);
-		//binaryPath = detect_path(channels[1](ROI));
-
 		/**COLOUR LINE METHOD 2 - THE BEST CURRENTLY**/
 		// convert hsv image to bgr->greyscale for processing
 		cvtColor(imHSV, imGrey, COLOR_BGR2GRAY);
-		binaryPath = detect_path(imGrey(ROI));
-
-		/**COLOUR LINE METHOD 3 - SATURATION AND VOLUME**/
-		// combine hue and saturation into new image
-		//split(imHSV, channels);
-		//Mat imSV = (channels[2]/2 + channels[1]/2);
-		//binaryPath = detect_path(imSV(ROI));
-
-		// saturation
-		//Mat mask;
-		//inRange(imHSV(ROI), Scalar(0, 80, 40), Scalar(255, 255, 255), mask);
-		//imshow("Saturation mask", mask);
+		detect_path(imGrey(ROI), steeringAngle, speed);
 		
 		// measure HSV colour at the centre of the image, for example
 		//cout << imHSV.at<Vec3b>(imHSV.size().width/2,imHSV.size().height/2) << endl;
-
-		/**DISPLAY PATH ON TOP OF IMAGE**/
-		Mat imPath = im(ROI).clone();
-		Mat invBinaryPath, threeChannelMask;
-		Mat zeroMask = Mat::zeros(imPath.size(), CV_8UC1);
-		bitwise_not(binaryPath,invBinaryPath);
-
-		Mat pathMasks[] = {invBinaryPath, invBinaryPath, invBinaryPath};
-		merge(pathMasks, 3, threeChannelMask);
-		bitwise_and(imPath, threeChannelMask, imPath);
-
-		Mat redMask[] = {zeroMask, zeroMask, binaryPath};
-		merge(redMask, 3, threeChannelMask);
-		bitwise_or(imPath, threeChannelMask, imPath);
-
-		imshow("path", imPath);
 
 		// get list of obstacles
 		detect_obstacles(imHSV(ROI), obstacles);
@@ -202,7 +172,7 @@ int main(int argc, char * argv[])
 	return 0;
 }
 
-Mat detect_path(Mat grey)
+void detect_path(Mat grey, float & steeringAngle, float & speed)
 {
 	imshow("Single channel path frame", grey);
 
@@ -240,6 +210,9 @@ Mat detect_path(Mat grey)
 	double deltaF = 0;
 	double oldF = 0;
 	double difference = 0;
+
+	double maxAccel = 0;
+	int maxRow = height - 1;
 
 	// keeps track of the presence of the left and right edges in each row of any frame
 	bool rightFound, leftFound;
@@ -288,13 +261,25 @@ Mat detect_path(Mat grey)
 		// derivative term
 		deltaF = ff - oldF;
 		// cap derivative term in case of sudden jumps in path
-		deltaF = max(deltaF, -5.0); deltaF = min(deltaF, 5.0);
+		deltaF = max(deltaF, -3.0); deltaF = min(deltaF, 3.0);
+
+		double accel;
 
 		// feed terms into horizontal rate accross image
 		if(row == height - 1){
-			difference += ff * 0.01;
+			accel = ff * 0.005;
 		} else {
-			difference += ff * 0.01 + deltaF * 0.1;
+			accel = ff * 0.005 + deltaF * 0.1;
+		}
+
+		accel = min(accel, 0.5); accel = max(accel, -0.5);
+		difference += accel;
+
+		if(row > 80){
+			if(abs(accel) > maxAccel){
+				maxAccel = abs(accel);
+				maxRow = row;
+			}
 		}
 
 		// adjust centre of path accordingly
@@ -316,22 +301,7 @@ Mat detect_path(Mat grey)
 
 	imshow("Grey with path superimposed", grey);
 
-	return centrePath;
-
-	// get approximate contours from binary mask
-	/*vector<vector<Point>> contours;
-	vector<Vec4i> hierarchy;
-
-	findContours(edges, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0,0));
-
-	Mat edgeContours = Mat::zeros(grey.size(), CV_8UC3);
-	for(size_t i = 0; i < contours.size(); ++i){
-		if(arcLength(contours[i], true) > 100){
-			drawContours(edgeContours, contours, i, Scalar(rand()& 255, rand()& 255, rand()& 255));
-		}
-	}
-	
-	imshow("Edge contours", edgeContours);*/
+	cout << "Max accel: " << maxAccel << " at row " << maxRow << endl;
 }
 
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj)

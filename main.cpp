@@ -12,7 +12,13 @@
 //#define USB_WEBCAM
 
 // Define if processing using still images instead of video
-#define STILL_IMAGES
+//#define STILL_IMAGES
+
+// Define if motors are to be driven
+//#define MOTORS_ENABLE
+
+// Define to display all image output
+#define DISP_TEST
 
 #ifndef USB_WEBCAM
 // Raspicam CV
@@ -80,7 +86,9 @@ int main(int argc, char * argv[])
 	int imIndex = 462; // first jpeg in samples folder has index 0462
 
 	// Instantiate drive signals
-	//DriveControl control;
+	#ifdef MOTORS_ENABLE
+		DriveControl control;
+	#endif
 	float steeringAngle;
 	float speed;
 
@@ -137,6 +145,12 @@ int main(int argc, char * argv[])
 		// convert hsv image to bgr->greyscale for processing
 		cvtColor(imHSV, imGrey, COLOR_BGR2GRAY);
 		detect_path(imGrey(ROI), steeringAngle, speed);
+
+		cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
+
+		#ifdef MOTORS_ENABLE
+			// inset drive control code here
+		#endif
 		
 		// measure HSV colour at the centre of the image, for example
 		//cout << imHSV.at<Vec3b>(imHSV.size().width/2,imHSV.size().height/2) << endl;
@@ -153,7 +167,9 @@ int main(int argc, char * argv[])
 		cout << "Image size: " << im.size() << " Loop time: " << millis() - loopTime << endl;
 
 		// display image on screen
+		#ifdef DISP_TEST
 		//imshow("camera", im);
+		#endif
 
 		// allow for images to be displayed on desktop application
 		#ifdef STILL_IMAGES
@@ -174,27 +190,11 @@ int main(int argc, char * argv[])
 
 void detect_path(Mat grey, float & steeringAngle, float & speed)
 {
-	imshow("Single channel path frame", grey);
-
 	// get edge binary mask from grey image
 	Mat edges;
 
 	/** PLEASE READ UP ON CANNY **/
 	Canny(grey, edges, 80, 240); // note edge thresholding numbers
-
-	// show binary mask
-	imshow("Canny", edges);
-
-	/*vector<Vec4i> lines;
-	HoughLinesP(edges, lines, 1, CV_PI/180, 10, 10, 20);
-	Mat hough = Mat::zeros(grey.size(), CV_8UC3);
-	for(size_t i = 0; i < lines.size(); ++i){
-		double grad = (double)(lines[i][3] - lines[i][1]) / (double)(lines[i][2]-lines[i][0]);
-		if(abs(grad) > 0.2){
-			line(hough, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1, 8);
-		}
-	}
-	imshow("Hough", hough);*/
 
 	// Path matrix, which calculated path will be drawn on
 	Mat centrePath = Mat::zeros(grey.size(), CV_8UC1);
@@ -211,6 +211,7 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 	double oldF = 0;
 	double difference = 0;
 
+	steeringAngle = 0;
 	double maxAccel = 0;
 	int maxRow = height - 1;
 
@@ -275,11 +276,15 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 		accel = min(accel, 0.5); accel = max(accel, -0.5);
 		difference += accel;
 
-		if(row > 80){
+		if(row > 80){ // some threshold up the image after which sharpness of corners doesn't matter
 			if(abs(accel) > maxAccel){
 				maxAccel = abs(accel);
 				maxRow = row;
 			}
+		}
+
+		if(row > height - 40){
+			steeringAngle += accel;
 		}
 
 		// adjust centre of path accordingly
@@ -297,11 +302,17 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 		}
 		
 	}
-	imshow("Centre path", centrePath);
 
-	imshow("Grey with path superimposed", grey);
+	// show binary mask
+	#ifdef DISP_TEST
+		imshow("Single channel path frame", grey);
+		imshow("Canny", edges);
+		imshow("Centre path", centrePath);
+		imshow("Grey with path superimposed", grey);
+	#endif
 
 	cout << "Max accel: " << maxAccel << " at row " << maxRow << endl;
+	speed = 1 - maxAccel;
 }
 
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
@@ -331,7 +342,9 @@ void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 	hierarchy.clear();
 
 	// display mask
+	#ifdef DISP_TEST
 	//imshow("mask", mask);
+	#endif
 
 	// get shapes around convex hulls
 	findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );	

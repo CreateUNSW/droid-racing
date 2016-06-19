@@ -86,7 +86,7 @@ int main(int argc, char * argv[])
 	float steeringAngle;
 	float speed;
 
-	Point2f src[] = {Point2f(ROI.width/4, ROI.height/4), Point2f(3*ROI.width/4, ROI.height/4), Point2f(1.25*ROI.width-1, ROI.height-1), Point2f(-ROI.width/4, ROI.height-1)};
+	Point2f src[] = {Point2f(ROI.width/4, ROI.height/4), Point2f(3*ROI.width/4, ROI.height/4), Point2f(1.25*ROI.width-1, 5*ROI.height/6), Point2f(-ROI.width/4, 5*ROI.height/6)};
 	Point2f dst[] = {Point2f(0,0), Point2f(ROI.width-1, 0), Point2f(ROI.width-1, ROI.height-1), Point2f(0, ROI.height-1)};
 	perspectiveMat = getPerspectiveTransform(src, dst);
 
@@ -266,7 +266,7 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 
 		// feed terms into horizontal rate accross image
 		if(row == height - 1){
-			accel = ff * 0.005;
+			accel = 0;// ff * 0.005;
 		} else {
 			accel = ff * 0.005 + deltaF * 0.1;
 		}

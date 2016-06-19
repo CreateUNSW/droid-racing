@@ -41,6 +41,8 @@ static string image_path = "/home/pi/droid-racing/sample_images/";
 	typedef VideoCapture camera_t;
 #endif
 
+Mat perspectiveMat;
+
 Mat detect_path(Mat grey);
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
 void camera_setup(camera_t & cam);
@@ -81,6 +83,10 @@ int main(int argc, char * argv[])
 
 	// Instantiate drive signals
 	//DriveControl control;
+
+	Point2f src[] = {Point2f(ROI.width/4, ROI.height/4), Point2f(3*ROI.width/4, ROI.height/4), Point2f(1.25*ROI.width-1, ROI.height-1), Point2f(-ROI.width/4, ROI.height-1)};
+	Point2f dst[] = {Point2f(0,0), Point2f(ROI.width-1, 0), Point2f(ROI.width-1, ROI.height-1), Point2f(0, ROI.height-1)};
+	perspectiveMat = getPerspectiveTransform(src, dst);
 
 	// Variable for timing
 	uint32_t loopTime;
@@ -157,6 +163,7 @@ int main(int argc, char * argv[])
 
 		/**DISPLAY PATH ON TOP OF IMAGE**/
 		Mat imPath = im(ROI).clone();
+		warpPerspective(imPath, imPath, perspectiveMat, imPath.size());
 		Mat invBinaryPath, threeChannelMask;
 		Mat zeroMask = Mat::zeros(imPath.size(), CV_8UC1);
 		bitwise_not(binaryPath,invBinaryPath);
@@ -215,6 +222,11 @@ Mat detect_path(Mat grey)
 	// show binary mask
 	imshow("Canny", edges);
 
+	warpPerspective(edges, edges, perspectiveMat, edges.size());
+
+	// show perspective-corrected edges
+	imshow("Corrected canny", edges);
+
 	/*vector<Vec4i> lines;
 	HoughLinesP(edges, lines, 1, CV_PI/180, 10, 10, 20);
 	Mat hough = Mat::zeros(grey.size(), CV_8UC3);
@@ -246,8 +258,6 @@ Mat detect_path(Mat grey)
 
 	// iterate from the bottom (droid) edge of the image to the top
 	for(row = height - 1; row >= 0; --row){
-		// calculate horizontal pseudo-effect of perspective 
-		perspectiveDistance = (height- row) * width / (3 * height);
 
 		// start looking for left border from the centre path, iterate outwards
 		leftBorder = centre;
@@ -256,7 +266,6 @@ Mat detect_path(Mat grey)
 			leftBorder--;
 			if(edges.at<uchar>(row, leftBorder) > 0){
 				// if an edge is found, assume its the border, and break
-				leftFound = true;
 				break;
 			}
 		}
@@ -268,17 +277,8 @@ Mat detect_path(Mat grey)
 			rightBorder++;
 			if(edges.at<uchar>(row, rightBorder) > 0){
 				// if an edge is found, assume its the border, and break
-				rightFound = true;
 				break;
 			}
-		}
-
-		// if either border was not found, assume it is a certain distance away from the path based on perspective
-		if(!leftFound){
-			leftBorder = max(0, (int)centre - (width/2 - perspectiveDistance));
-		}
-		if(!rightFound){
-			rightBorder = min(width, (int)centre + (width/2 - perspectiveDistance));
 		}
 
 		// feed calculated centre of the borders into the controller

@@ -6,6 +6,8 @@
 #include <chrono>
 #include <iostream>
 
+#include <wiringPi.h>
+
 #define SPEED_SIGNAL 0
 #define STEER_SIGNAL 1
 
@@ -15,6 +17,7 @@
 #define DEAD_ZONE 100
 
 #define INCREMENT 20
+#define CONTROL_FREQ 10 // 10 Hz loop
 
 using namespace std;
 
@@ -23,6 +26,7 @@ DriveControl::DriveControl()
 	// Initialise servo process (if not already)
 	servo_init();
 
+	// Zero desired control values
 	desiredSpeed = 0;
 	desiredAngle = 0;
 
@@ -38,15 +42,33 @@ DriveControl::DriveControl()
 DriveControl::~DriveControl()
 {
 	cout << "DriveControl destructor called" << endl;
+	
+	// Cause while loop to finish
 	running = false;
+	
+	// Wait for thread to complete
 	t->join();
+
+	// Delete thread safely
 	delete t;
 }
 
 void DriveControl::run()
 {
 	int speed, angle;
+
+	uint32_t time_ms = millis();
+
+	// Main thread control loop, at CONTROL_FREQ Hz
 	while(running){
+		// increment/decrement speed value until desired speed is reached
+		if(millis() - time_ms < 1000/CONTROL_FREQ){
+			this_thread::sleep_for(chrono::milliseconds(200/CONTROL_FREQ));
+			continue;
+		} else {
+			time_ms += 1000/CONTROL_FREQ;
+		}
+
 		if(desiredSpeed > currSpeed){
 			speed = min(currSpeed + INCREMENT, desiredSpeed);
 			set_speed(speed);
@@ -55,6 +77,7 @@ void DriveControl::run()
 			set_speed(speed);
 		}
 
+		// increment/decrement desired steering value until it is reached
 		if(desiredAngle > currAngle){
 			angle = min(currAngle + INCREMENT, desiredAngle);
 			set_steer(angle);
@@ -62,23 +85,23 @@ void DriveControl::run()
 			angle = max(currAngle - INCREMENT, desiredAngle);
 			set_steer(angle);
 		}
-		
-		this_thread::sleep_for(chrono::milliseconds(100));	
 	}
 }
 
 void DriveControl::set_desired_speed(int speed)
 {
+	// set and constrain new desired speed
 	desiredSpeed = min(speed, MAX_SPEED);
 	desiredSpeed = max(speed, -MAX_SPEED);
-	cout << "Setting desired speed: " << speed << endl;
+	//cout << "Setting desired speed: " << speed << endl;
 }
 
 void DriveControl::set_desired_steer(int angle)
 {
+	// set and constrain new desired steering angle
 	desiredAngle = min(angle, MAX_STEER);
 	desiredAngle = max(angle, -MAX_STEER);
-	cout << "Setting desired steer: " << angle << endl;
+	//cout << "Setting desired steer: " << angle << endl;
 }
 
 void DriveControl::set_speed(int speed)

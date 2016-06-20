@@ -51,6 +51,10 @@ void servo_init()
 */
 void servo_stop()
 {
+	// Neutral/off position for both servo signals
+	servo_write(0, 1500);
+	servo_write(1, 1500);
+
 	cout << "Stopping servo process" << endl;
 	system("sudo kill $(pgrep servod)");
 

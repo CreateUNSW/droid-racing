@@ -33,7 +33,7 @@ void servo_init()
 	
 	if ( i > 0 ){
 		cout << "Initialising servo process" << endl;
-		system("sudo ./servod --min=1000us --max=2000us");
+		system("sudo ./servod --min=1000us --max=2000us --cycle-time=16200us");
 
 		// Trap exit behaviour
 		signal(SIGINT, signalHandler);

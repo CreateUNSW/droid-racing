@@ -12,7 +12,7 @@
 //#define USB_WEBCAM
 
 // Define if processing using still images instead of video
-//#define STILL_IMAGES
+#define STILL_IMAGES
 
 // Define if motors are to be driven
 //#define MOTORS_ENABLE
@@ -75,7 +75,12 @@ int main(int argc, char * argv[])
 		camera_setup(cam);
 
 		// Open camera
+		#ifdef USB_WEBCAM
 		cam.open(0);
+		#else
+		cam.open();
+		#endif
+
 		if (!cam.isOpened()){
 			return -1;
 		}

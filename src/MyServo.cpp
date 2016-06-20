@@ -17,6 +17,7 @@ bool servoInitialised = false;
 */
 void signalHandler( int signum )
 {
+	cout << "Received signal " << signum << endl;
 	if (signum == SIGINT){
 		cout << endl << "Caught SIGINT" << endl;
 		exit(1);
@@ -33,7 +34,7 @@ void servo_init()
 	
 	if ( i > 0 ){
 		cout << "Initialising servo process" << endl;
-		system("sudo ./servod --min=1000us --max=2000us --cycle-time=16200us");
+		system("sudo ./bin/servod --min=1000us --max=2000us --cycle-time=16200us");
 
 		// Trap exit behaviour
 		signal(SIGINT, signalHandler);

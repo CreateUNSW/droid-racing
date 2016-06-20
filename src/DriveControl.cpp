@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <thread>
 #include <chrono>
+#include <iostream>
 
 #define SPEED_SIGNAL 0
 #define STEER_SIGNAL 1
@@ -30,11 +31,14 @@ DriveControl::DriveControl()
 	set_steer(0);
 
 	// Begin thread
+	running = true;
 	t = new thread(&DriveControl::run, this);
 }
 
 DriveControl::~DriveControl()
 {
+	cout << "DriveControl destructor called" << endl;
+	running = false;
 	t->join();
 	delete t;
 }
@@ -42,7 +46,7 @@ DriveControl::~DriveControl()
 void DriveControl::run()
 {
 	int speed, angle;
-	while(1){
+	while(running){
 		if(desiredSpeed > currSpeed){
 			speed = min(currSpeed + INCREMENT, desiredSpeed);
 			set_speed(speed);
@@ -56,11 +60,25 @@ void DriveControl::run()
 			set_steer(angle);
 		} else if(desiredAngle < currAngle){
 			angle = max(currAngle - INCREMENT, desiredAngle);
-			set_speed(angle);
+			set_steer(angle);
 		}
 		
 		this_thread::sleep_for(chrono::milliseconds(100));	
 	}
+}
+
+void DriveControl::set_desired_speed(int speed)
+{
+	desiredSpeed = min(speed, MAX_SPEED);
+	desiredSpeed = max(speed, -MAX_SPEED);
+	cout << "Setting desired speed: " << speed << endl;
+}
+
+void DriveControl::set_desired_steer(int angle)
+{
+	desiredAngle = min(angle, MAX_STEER);
+	desiredAngle = max(angle, -MAX_STEER);
+	cout << "Setting desired steer: " << angle << endl;
 }
 
 void DriveControl::set_speed(int speed)

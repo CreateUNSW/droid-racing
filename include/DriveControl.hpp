@@ -29,7 +29,8 @@ private:
 	int currSpeed;
 	int currAngle;
 
-	thread *t;	
+	thread *t;
+	bool running;
 };
 
 #endif

@@ -15,7 +15,7 @@
 #define STILL_IMAGES
 
 // Define if motors are to be driven
-//#define MOTORS_ENABLE
+#define MOTORS_ENABLE
 
 // Define to display all image output
 #define DISP_TEST
@@ -154,7 +154,8 @@ int main(int argc, char * argv[])
 		cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
 
 		#ifdef MOTORS_ENABLE
-			// inset drive control code here
+			control.set_desired_speed(speed * 150);
+			control.set_desired_steer(steeringAngle * 150);
 		#endif
 		
 		// measure HSV colour at the centre of the image, for example

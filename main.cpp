@@ -9,10 +9,10 @@
 #include <opencv2/highgui.hpp>
 
 // Define if using a normal camera instead of raspberry pi cam
-//#define USB_WEBCAM
+#define USB_WEBCAM
 
 // Define if processing using still images instead of video
-#define STILL_IMAGES
+//#define STILL_IMAGES
 
 #ifndef USB_WEBCAM
 // Raspicam CV
@@ -26,8 +26,8 @@
 #include "DriveControl.hpp"
 
 // Image width and height constants
-static const int iw = 320;
-static const int ih = 240;
+static const int iw = 640;
+static const int ih = 480;
 
 using namespace std;
 using namespace cv;
@@ -61,7 +61,8 @@ int main(int argc, char * argv[])
 
 	// Region of interest for scanning
 	// bottom half of image
-	Rect2i ROI = Rect2i(0, ih/4, iw, 3*ih/4);
+	//Rect2i ROI(0, ih/4, iw, 3*ih/4);
+	Rect2i ROI(0, 0, iw, ih);
 
 	#ifndef STILL_IMAGES
 		// Instantiate camera object
@@ -71,7 +72,11 @@ int main(int argc, char * argv[])
 		camera_setup(cam);
 
 		// Open camera
+		#ifdef USB_WEBCAM
 		cam.open(0);
+		#else
+		cam.open();
+		#endif
 		if (!cam.isOpened()){
 			return -1;
 		}
@@ -86,9 +91,14 @@ int main(int argc, char * argv[])
 	float steeringAngle;
 	float speed;
 
-	Point2f src[] = {Point2f(ROI.width/4, ROI.height/4), Point2f(3*ROI.width/4, ROI.height/4), Point2f(1.25*ROI.width-1, 5*ROI.height/6), Point2f(-ROI.width/4, 5*ROI.height/6)};
+	float aperture= 3.0;
+
+	//Point2f src[] = {Point2f(ROI.width/4, ROI.height/4), Point2f(3*ROI.width/4, ROI.height/4), Point2f(1.25*ROI.width-1, 5*ROI.height/6), Point2f(-ROI.width/4, 5*ROI.height/6)};
+	Point2f src[] = {Point2f(0, 0), Point2f(ROI.width-1, 0), Point2f(aperture*ROI.width, ROI.height-1), Point2f((1-aperture)*ROI.width,ROI.height-1)};
 	Point2f dst[] = {Point2f(0,0), Point2f(ROI.width-1, 0), Point2f(ROI.width-1, ROI.height-1), Point2f(0, ROI.height-1)};
 	perspectiveMat = getPerspectiveTransform(src, dst);
+
+	ROI = Rect2i(0,0, 320, 240);
 
 	// Variable for timing
 	uint32_t loopTime;
@@ -103,7 +113,11 @@ int main(int argc, char * argv[])
 		#ifndef STILL_IMAGES
 			// if using camera, grab image
 			cam.grab();
+			//#ifdef USB_WEBCAM
 			cam.retrieve(imLarge);
+			//#else
+			//cam.retrieve(im);
+			//#endif
 
 		#else
 			// if using sample images, load next image
@@ -133,8 +147,9 @@ int main(int argc, char * argv[])
 			imIndex++;
 		#endif
 
+		warpPerspective(imLarge, imLarge, perspectiveMat, imLarge.size());
 		// currently resize to 320x240 because webcam won't let me read at that
-		resize(imLarge, im, Size(iw,ih), 0, 0, CV_INTER_LINEAR);
+		resize(imLarge, im, Size(320,240), 0, 0, CV_INTER_LINEAR);
 
 		// convert image to HSV for processing
 		cvtColor(im, imHSV, COLOR_BGR2HSV);
@@ -159,7 +174,7 @@ int main(int argc, char * argv[])
 		cout << "Image size: " << im.size() << " Loop time: " << millis() - loopTime << endl;
 
 		// display image on screen
-		//imshow("camera", im);
+		imshow("camera", im);
 
 		// allow for images to be displayed on desktop application
 		#ifdef STILL_IMAGES
@@ -180,6 +195,8 @@ int main(int argc, char * argv[])
 
 void detect_path(Mat grey, float & steeringAngle, float & speed)
 {
+	//warpPerspective(grey, grey, perspectiveMat, grey.size());
+
 	imshow("Single channel path frame", grey);
 
 	// get edge binary mask from grey image
@@ -191,7 +208,7 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 	// show binary mask
 	imshow("Canny", edges);
 
-	warpPerspective(edges, edges, perspectiveMat, edges.size());
+	//warpPerspective(edges, edges, perspectiveMat, edges.size());
 
 	// show perspective-corrected edges
 	imshow("Corrected canny", edges);
@@ -268,10 +285,10 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 		if(row == height - 1){
 			accel = 0;// ff * 0.005;
 		} else {
-			accel = ff * 0.005 + deltaF * 0.1;
+			accel = ff * 0.001 + deltaF * 0.01;
 		}
 
-		accel = min(accel, 0.5); accel = max(accel, -0.5);
+		accel = min(accel, 0.3); accel = max(accel, -0.3);
 		difference += accel;
 
 		if(row > 80){
@@ -362,8 +379,9 @@ void camera_setup(camera_t & cam)
 	// For example
 	#ifndef USB_WEBCAM
 		cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
-		cam.set(CV_CAP_PROP_FRAME_WIDTH, iw);
-		cam.set(CV_CAP_PROP_FRAME_HEIGHT, ih);
+		cam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+		cam.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+		cam.set(CV_CAP_PROP_SATURATION, 80);
 	#else
 		// does this work?
 		cam.set(CV_CAP_PROP_FRAME_WIDTH, iw);

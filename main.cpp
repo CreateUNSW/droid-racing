@@ -26,8 +26,8 @@
 #include "DriveControl.hpp"
 
 // Image width and height constants
-static const int iw = 640;
-static const int ih = 480;
+static const int iw = 320;
+static const int ih = 240;
 
 using namespace std;
 using namespace cv;
@@ -98,7 +98,7 @@ int main(int argc, char * argv[])
 	Point2f dst[] = {Point2f(0,0), Point2f(ROI.width-1, 0), Point2f(ROI.width-1, ROI.height-1), Point2f(0, ROI.height-1)};
 	perspectiveMat = getPerspectiveTransform(src, dst);
 
-	ROI = Rect2i(0,0, 320, 240);
+	//ROI = Rect2i(0,0, 320, 240);
 
 	// Variable for timing
 	uint32_t loopTime;
@@ -147,9 +147,12 @@ int main(int argc, char * argv[])
 			imIndex++;
 		#endif
 
-		warpPerspective(imLarge, imLarge, perspectiveMat, imLarge.size());
 		// currently resize to 320x240 because webcam won't let me read at that
 		resize(imLarge, im, Size(320,240), 0, 0, CV_INTER_LINEAR);
+		// display image on screen
+		imshow("Camera", im);
+
+		warpPerspective(im, im, perspectiveMat, im.size());
 
 		// convert image to HSV for processing
 		cvtColor(im, imHSV, COLOR_BGR2HSV);
@@ -174,7 +177,7 @@ int main(int argc, char * argv[])
 		cout << "Image size: " << im.size() << " Loop time: " << millis() - loopTime << endl;
 
 		// display image on screen
-		imshow("camera", im);
+		imshow("Perspective correction", im);
 
 		// allow for images to be displayed on desktop application
 		#ifdef STILL_IMAGES

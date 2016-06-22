@@ -11,12 +11,12 @@
 #define SPEED_SIGNAL 0
 #define STEER_SIGNAL 1
 
-#define MAX_SPEED 250
-#define MAX_STEER 250
+#define MAX_SPEED 80
+#define MAX_STEER 350
 
-#define DEAD_ZONE 100
+#define DEAD_ZONE 60
 
-#define INCREMENT 20
+#define INCREMENT 5
 #define CONTROL_FREQ 10 // 10 Hz loop
 
 using namespace std;
@@ -79,10 +79,10 @@ void DriveControl::run()
 
 		// increment/decrement desired steering value until it is reached
 		if(desiredAngle > currAngle){
-			angle = min(currAngle + INCREMENT, desiredAngle);
+			angle = min(currAngle + INCREMENT*30, desiredAngle);
 			set_steer(angle);
 		} else if(desiredAngle < currAngle){
-			angle = max(currAngle - INCREMENT, desiredAngle);
+			angle = max(currAngle - INCREMENT*30, desiredAngle);
 			set_steer(angle);
 		}
 	}
@@ -118,7 +118,7 @@ void DriveControl::set_speed(int speed)
 	}
 
 	// Write out speed servo signal, in reverse
-	servo_write(SPEED_SIGNAL, 1500 - (speed + shift));
+	servo_write(SPEED_SIGNAL, 1500 + (speed + shift));
 	currSpeed = speed;
 }
 
@@ -129,6 +129,6 @@ void DriveControl::set_steer(int steer)
 	steer = max(steer, -MAX_STEER);
 
 	// Write out steer servo signal
-	servo_write(STEER_SIGNAL, 1500 + steer);
+	servo_write(STEER_SIGNAL, 1500 - steer);
 	currAngle = steer;
 }

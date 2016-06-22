@@ -12,13 +12,13 @@
 //#define USB_WEBCAM
 
 // Define if processing using still images instead of video
-#define STILL_IMAGES
+//#define STILL_IMAGES
 
 // Define if motors are to be driven
 #define MOTORS_ENABLE
 
 // Define to display all image output
-#define DISP_TEST
+//#define DISP_TEST
 
 #ifndef USB_WEBCAM
 // Raspicam CV
@@ -38,7 +38,7 @@ static const int ih = 240;
 using namespace std;
 using namespace cv;
 
-static string image_path = "/home/pi/droid-racing/sample_images/";
+static string image_path = "./sample_images/";
 
 // define camera_t as raspberry pi cv camera class (or usb webcam)
 #ifndef USB_WEBCAM
@@ -110,8 +110,11 @@ int main(int argc, char * argv[])
 		#ifndef STILL_IMAGES
 			// if using camera, grab image
 			cam.grab();
+			#ifdef USB_WEBCAM
 			cam.retrieve(imLarge);
-
+			#else
+			cam.retrieve(im);
+			#endif
 		#else
 			// if using sample images, load next image
 
@@ -141,7 +144,8 @@ int main(int argc, char * argv[])
 		#endif
 
 		// currently resize to 320x240 because webcam won't let me read at that
-		resize(imLarge, im, Size(iw,ih), 0, 0, CV_INTER_LINEAR);
+		//resize(imLarge, im, Size(iw,ih), 0, 0, CV_INTER_LINEAR);
+		//im = imLarge;
 
 		// convert image to HSV for processing
 		cvtColor(im, imHSV, COLOR_BGR2HSV);
@@ -149,13 +153,19 @@ int main(int argc, char * argv[])
 		/**COLOUR LINE METHOD 2 - THE BEST CURRENTLY**/
 		// convert hsv image to bgr->greyscale for processing
 		cvtColor(imHSV, imGrey, COLOR_BGR2GRAY);
+
+		//imshow("HSV image", imHSV);
+		//cvtColor(im, imGrey, COLOR_BGR2GRAY);
 		detect_path(imGrey(ROI), steeringAngle, speed);
 
 		cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
 
 		#ifdef MOTORS_ENABLE
-			control.set_desired_speed(speed * 150);
-			control.set_desired_steer(steeringAngle * 150);
+			int outAngle = steeringAngle * 400;
+			int outSpeed = speed * 60;
+			cout << "Writing out speed: " << outSpeed << " angle: " << outAngle << endl;
+			control.set_desired_speed(outSpeed);
+			control.set_desired_steer(outAngle);
 		#endif
 		
 		// measure HSV colour at the centre of the image, for example
@@ -170,11 +180,11 @@ int main(int argc, char * argv[])
 		}
 
 		// print out info
-		cout << "Image size: " << im.size() << " Loop time: " << millis() - loopTime << endl;
+		//cout << "Image size: " << im.size() << " Loop time: " << millis() - loopTime << endl;
 
 		// display image on screen
 		#ifdef DISP_TEST
-		//imshow("camera", im);
+		imshow("camera", im);
 		#endif
 
 		// allow for images to be displayed on desktop application
@@ -184,7 +194,7 @@ int main(int argc, char * argv[])
 			cout << "Press any key for next image" << endl;
 			// need to be clicked in to one of the image windows (not terminal) for this to work
 			waitKey();
-		#else
+		#elif defined DISP_TEST
 			waitKey(5);
 		#endif
 
@@ -201,6 +211,8 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 
 	/** PLEASE READ UP ON CANNY **/
 	Canny(grey, edges, 80, 240); // note edge thresholding numbers
+
+	//imshow("Single channel path frame", grey);
 
 	// Path matrix, which calculated path will be drawn on
 	Mat centrePath = Mat::zeros(grey.size(), CV_8UC1);
@@ -289,7 +301,7 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 			}
 		}
 
-		if(row > height - 40){
+		if(row > height - 20){
 			steeringAngle += accel;
 		}
 
@@ -311,7 +323,6 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 
 	// show binary mask
 	#ifdef DISP_TEST
-		imshow("Single channel path frame", grey);
 		imshow("Canny", edges);
 		imshow("Centre path", centrePath);
 		imshow("Grey with path superimposed", grey);
@@ -384,11 +395,14 @@ void camera_setup(camera_t & cam)
 		cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
 		cam.set(CV_CAP_PROP_FRAME_WIDTH, iw);
 		cam.set(CV_CAP_PROP_FRAME_HEIGHT, ih);
+		//cam.set(CV_CAP_PROP_BRIGHTNESS, 50); 
+		cam.set(CV_CAP_PROP_SATURATION, 70);
 	#else
 		// does this work?
 		cam.set(CV_CAP_PROP_FRAME_WIDTH, iw);
 		cam.set(CV_CAP_PROP_FRAME_HEIGHT, ih);
-		cam.set(CV_CAP_PROP_EXPOSURE, 10);
+		//cam.set(CV_CAP_PROP_EXPOSURE, 10);
+		
 	#endif
 }
 

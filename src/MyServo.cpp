@@ -34,7 +34,7 @@ void servo_init()
 	
 	if ( i > 0 ){
 		cout << "Initialising servo process" << endl;
-		system("sudo ./bin/servod --min=1000us --max=2000us --cycle-time=16200us");
+		system("sudo ./bin/servod --min=1000us --max=2000us --cycle-time=16200us --step-size=5us");
 
 		// Trap exit behaviour
 		signal(SIGINT, signalHandler);
@@ -74,11 +74,11 @@ void servo_write(int index, int val)
 	assert(val >= 1000 && val <= 2000);
 
 	// Round to the nearest 10us, for './servod'
-	if (val % 10 > 0) {
-		if (val % 10 >= 5){
-			val += 10 - (val % 10);
+	if (val % 5 > 0) {
+		if (val % 5 >= 3){
+			val += 5 - (val % 5);
 		} else {
-			val -= (val % 10);
+			val -= (val % 5);
 		}
 	}
 

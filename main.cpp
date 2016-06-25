@@ -9,7 +9,7 @@
 #include <opencv2/highgui.hpp>
 
 // Define if using a normal camera instead of raspberry pi cam
-//#define USB_WEBCAM
+#define USB_WEBCAM
 
 // Define if processing using still images instead of video
 //#define STILL_IMAGES
@@ -47,13 +47,15 @@ static string image_path = "./sample_images/";
 	typedef VideoCapture camera_t;
 #endif
 
+Mat perspectiveMat;
+
 void detect_path(Mat grey, float & steeringAngle, float & speed);
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
 void camera_setup(camera_t & cam);
 void sleep(double seconds);
 
 int main(int argc, char * argv[])
-{	
+{
 	// Mat variables for storage of images
 	Mat im, imHSV, imGrey, imLarge, binaryPath;
 
@@ -65,7 +67,8 @@ int main(int argc, char * argv[])
 
 	// Region of interest for scanning
 	// bottom half of image
-	Rect2i ROI = Rect2i(0, ih/4, iw, 3*ih/4);
+	//Rect2i ROI(0, ih/4, iw, 3*ih/4);
+	Rect2i ROI(0, 0, iw, ih);
 
 	#ifndef STILL_IMAGES
 		// Instantiate camera object
@@ -97,6 +100,15 @@ int main(int argc, char * argv[])
 	float steeringAngle;
 	float speed;
 
+	float aperture= 3.0;
+
+	//Point2f src[] = {Point2f(ROI.width/4, ROI.height/4), Point2f(3*ROI.width/4, ROI.height/4), Point2f(1.25*ROI.width-1, 5*ROI.height/6), Point2f(-ROI.width/4, 5*ROI.height/6)};
+	Point2f src[] = {Point2f(0, 0), Point2f(ROI.width-1, 0), Point2f(aperture*ROI.width, ROI.height-1), Point2f((1-aperture)*ROI.width,ROI.height-1)};
+	Point2f dst[] = {Point2f(0,0), Point2f(ROI.width-1, 0), Point2f(ROI.width-1, ROI.height-1), Point2f(0, ROI.height-1)};
+	perspectiveMat = getPerspectiveTransform(src, dst);
+
+	//ROI = Rect2i(0,0, 320, 240);
+
 	// Variable for timing
 	uint32_t loopTime;
 
@@ -110,6 +122,7 @@ int main(int argc, char * argv[])
 		#ifndef STILL_IMAGES
 			// if using camera, grab image
 			cam.grab();
+
 			#ifdef USB_WEBCAM
 			cam.retrieve(imLarge);
 			#else
@@ -143,9 +156,11 @@ int main(int argc, char * argv[])
 			imIndex++;
 		#endif
 
-		// currently resize to 320x240 because webcam won't let me read at that
-		//resize(imLarge, im, Size(iw,ih), 0, 0, CV_INTER_LINEAR);
-		//im = imLarge;
+		resize(imLarge, im, Size(320,240), 0, 0, CV_INTER_LINEAR);
+		// display image on screen
+		imshow("Camera", im);
+
+		warpPerspective(im, im, perspectiveMat, im.size());
 
 		// convert image to HSV for processing
 		cvtColor(im, imHSV, COLOR_BGR2HSV);
@@ -167,7 +182,7 @@ int main(int argc, char * argv[])
 			control.set_desired_speed(outSpeed);
 			control.set_desired_steer(outAngle);
 		#endif
-		
+
 		// measure HSV colour at the centre of the image, for example
 		//cout << imHSV.at<Vec3b>(imHSV.size().width/2,imHSV.size().height/2) << endl;
 
@@ -184,8 +199,9 @@ int main(int argc, char * argv[])
 
 		// display image on screen
 		#ifdef DISP_TEST
-		imshow("camera", im);
+		imshow("Perspective correction", im);
 		#endif
+
 
 		// allow for images to be displayed on desktop application
 		#ifdef STILL_IMAGES
@@ -206,13 +222,16 @@ int main(int argc, char * argv[])
 
 void detect_path(Mat grey, float & steeringAngle, float & speed)
 {
+	//warpPerspective(grey, grey, perspectiveMat, grey.size());
+
+	imshow("Single channel path frame", grey);
+
 	// get edge binary mask from grey image
 	Mat edges;
 
 	/** PLEASE READ UP ON CANNY **/
 	Canny(grey, edges, 80, 240); // note edge thresholding numbers
 
-	//imshow("Single channel path frame", grey);
 
 	// Path matrix, which calculated path will be drawn on
 	Mat centrePath = Mat::zeros(grey.size(), CV_8UC1);
@@ -238,8 +257,6 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 
 	// iterate from the bottom (droid) edge of the image to the top
 	for(row = height - 1; row >= 0; --row){
-		// calculate horizontal pseudo-effect of perspective 
-		perspectiveDistance = (height- row) * width / (3 * height);
 
 		// start looking for left border from the centre path, iterate outwards
 		leftBorder = centre;
@@ -248,7 +265,6 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 			leftBorder--;
 			if(edges.at<uchar>(row, leftBorder) > 0){
 				// if an edge is found, assume its the border, and break
-				leftFound = true;
 				break;
 			}
 		}
@@ -260,21 +276,12 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 			rightBorder++;
 			if(edges.at<uchar>(row, rightBorder) > 0){
 				// if an edge is found, assume its the border, and break
-				rightFound = true;
 				break;
 			}
 		}
 
-		// if either border was not found, assume it is a certain distance away from the path based on perspective
-		if(!leftFound){
-			leftBorder = max(0, (int)centre - (width/2 - perspectiveDistance));
-		}
-		if(!rightFound){
-			rightBorder = min(width, (int)centre + (width/2 - perspectiveDistance));
-		}
-
 		// feed calculated centre of the borders into the controller
-		double deadCentre = (leftBorder + rightBorder)/2;	
+		double deadCentre = (leftBorder + rightBorder)/2;
 		// proportional term
 		double ff = deadCentre - centre;
 		// derivative term
@@ -286,12 +293,12 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 
 		// feed terms into horizontal rate accross image
 		if(row == height - 1){
-			accel = ff * 0.005;
+			accel = 0;// ff * 0.005;
 		} else {
-			accel = ff * 0.005 + deltaF * 0.1;
+			accel = ff * 0.001 + deltaF * 0.01;
 		}
 
-		accel = min(accel, 0.5); accel = max(accel, -0.5);
+		accel = min(accel, 0.3); accel = max(accel, -0.3);
 		difference += accel;
 
 		if(row > 80){ // some threshold up the image after which sharpness of corners doesn't matter
@@ -318,7 +325,7 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 			centrePath.at<uchar>(row, (int)centre + i) = uchar(255);
 			grey.at<uchar>(row, (int)centre + i) = uchar(255);
 		}
-		
+
 	}
 
 	// show binary mask
@@ -347,7 +354,7 @@ void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 	// variables for defining objects
 	vector<vector<Point>> contours;
 	vector<Vec4i> hierarchy;
-	
+
 	// draw convex hulls around detected contours
 	findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );
 	vector<vector<Point>> hull(contours.size());
@@ -364,7 +371,7 @@ void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 	#endif
 
 	// get shapes around convex hulls
-	findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );	
+	findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );
 	vector<vector<Point>> contours_poly( contours.size() );
 	for(size_t i = 0; i < contours.size(); ++i){
 		approxPolyDP( Mat(contours[i]), contours_poly[i], 3, true);
@@ -374,9 +381,9 @@ void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 
 void camera_setup(camera_t & cam)
 {
-	/**Sets a property in the VideoCapture. 
-	* 
-	* 
+	/**Sets a property in the VideoCapture.
+	*
+	*
 	* Implemented properties:
 	* CV_CAP_PROP_FRAME_WIDTH,CV_CAP_PROP_FRAME_HEIGHT,
 	* CV_CAP_PROP_FORMAT: CV_8UC1 or CV_8UC3
@@ -389,20 +396,18 @@ void camera_setup(camera_t & cam)
 	* CV_CAP_PROP_WHITE_BALANCE_BLUE_U : [1,100] -1 auto whitebalance
 	*
 	*/
-	
+
 	// For example
 	#ifndef USB_WEBCAM
 		cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
+		cam.set(CV_CAP_PROP_SATURATION, 70);
 		cam.set(CV_CAP_PROP_FRAME_WIDTH, iw);
 		cam.set(CV_CAP_PROP_FRAME_HEIGHT, ih);
-		//cam.set(CV_CAP_PROP_BRIGHTNESS, 50); 
-		cam.set(CV_CAP_PROP_SATURATION, 70);
 	#else
 		// does this work?
-		cam.set(CV_CAP_PROP_FRAME_WIDTH, iw);
-		cam.set(CV_CAP_PROP_FRAME_HEIGHT, ih);
+		cam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+		cam.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 		//cam.set(CV_CAP_PROP_EXPOSURE, 10);
-		
 	#endif
 }
 

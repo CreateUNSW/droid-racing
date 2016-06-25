@@ -2,14 +2,12 @@
 #include <iostream>
 #include <sys/time.h>
 #include <cstdlib>
+#include <list>
 
 // OpenCV libraries
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
-
-// Define if using a normal camera instead of raspberry pi cam
-#define USB_WEBCAM
 
 // Define if processing using still images instead of video
 //#define STILL_IMAGES
@@ -20,13 +18,12 @@
 // Define to display all image output
 //#define DISP_TEST
 
-#ifndef USB_WEBCAM
-// Raspicam CV
-#include <raspicam/raspicam_cv.h>
-#endif
-
 // GPIO and Arduino-like functions
 #include <wiringPi.h>
+
+// Flag pin
+#define FLAG_PIN 3
+#define REMOTE_PIN 4
 
 // Our own headers
 #include "DriveControl.hpp"
@@ -40,17 +37,14 @@ using namespace cv;
 
 static string image_path = "./sample_images/";
 
-// define camera_t as raspberry pi cv camera class (or usb webcam)
-#ifndef USB_WEBCAM
-	typedef raspicam::RaspiCam_Cv camera_t;
-#else
-	typedef VideoCapture camera_t;
-#endif
+typedef VideoCapture camera_t;
+typedef enum {RIGHT, LEFT, NEUTRAL} steering_dir_t;
 
 Mat perspectiveMat;
 
-void detect_path(Mat grey, float & steeringAngle, float & speed);
+void detect_path(Mat grey, double & steeringAngle, double & speed);
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
+bool handle_remote_switch(DriveControl & control);
 void camera_setup(camera_t & cam);
 void sleep(double seconds);
 
@@ -78,11 +72,7 @@ int main(int argc, char * argv[])
 		camera_setup(cam);
 
 		// Open camera
-		#ifdef USB_WEBCAM
 		cam.open(0);
-		#else
-		cam.open();
-		#endif
 
 		if (!cam.isOpened()){
 			return -1;
@@ -97,20 +87,32 @@ int main(int argc, char * argv[])
 	#ifdef MOTORS_ENABLE
 		DriveControl control;
 	#endif
-	float steeringAngle;
-	float speed;
+	double steeringAngle = 0;
+	double speed = 0;
 
 	float aperture= 3.0;
 
-	//Point2f src[] = {Point2f(ROI.width/4, ROI.height/4), Point2f(3*ROI.width/4, ROI.height/4), Point2f(1.25*ROI.width-1, 5*ROI.height/6), Point2f(-ROI.width/4, 5*ROI.height/6)};
 	Point2f src[] = {Point2f(0, 0), Point2f(ROI.width-1, 0), Point2f(aperture*ROI.width, ROI.height-1), Point2f((1-aperture)*ROI.width,ROI.height-1)};
 	Point2f dst[] = {Point2f(0,0), Point2f(ROI.width-1, 0), Point2f(ROI.width-1, ROI.height-1), Point2f(0, ROI.height-1)};
 	perspectiveMat = getPerspectiveTransform(src, dst);
 
-	//ROI = Rect2i(0,0, 320, 240);
+	wiringPiSetup();
+
+	pinMode(FLAG_PIN, INPUT);
+	pullUpDnControl(FLAG_PIN, PUD_UP);
+
+	pinMode(REMOTE_PIN, INPUT);
+	pullUpDnControl(REMOTE_PIN, PUD_UP);
+
+	sleep(0.1);
 
 	// Variable for timing
 	uint32_t loopTime;
+
+	#ifdef MOTORS_ENABLE
+		// Wait for remote switch to be pressed twice
+		while(!handle_remote_switch(control)){}
+	#endif
 
 	// main loop
 	while(1)
@@ -118,16 +120,17 @@ int main(int argc, char * argv[])
 		// get time of beginning of loop
 		loopTime = millis();
 
+		#ifdef MOTORS_ENABLE
+			// check for shutoff
+			handle_remote_switch(control);
+		#endif
+
 		// get next image
 		#ifndef STILL_IMAGES
 			// if using camera, grab image
 			cam.grab();
 
-			#ifdef USB_WEBCAM
 			cam.retrieve(imLarge);
-			#else
-			cam.retrieve(im);
-			#endif
 		#else
 			// if using sample images, load next image
 
@@ -157,8 +160,11 @@ int main(int argc, char * argv[])
 		#endif
 
 		resize(imLarge, im, Size(320,240), 0, 0, CV_INTER_LINEAR);
+
 		// display image on screen
-		imshow("Camera", im);
+		#ifdef DISP_TEST
+			imshow("Camera", im);
+		#endif
 
 		warpPerspective(im, im, perspectiveMat, im.size());
 
@@ -172,11 +178,20 @@ int main(int argc, char * argv[])
 		//imshow("HSV image", imHSV);
 		//cvtColor(im, imGrey, COLOR_BGR2GRAY);
 		detect_path(imGrey(ROI), steeringAngle, speed);
-
+		if(abs(steeringAngle) > 0.1){
+			int radius = abs(1000 / steeringAngle);
+			Point2i centre;
+			if(steeringAngle > 0){
+				centre = Point2i(iw/2 -1 + radius, ih - 1);
+			} else {
+				centre = Point2i(iw/2 - 1 - radius, ih - 1);
+			}
+			circle(im, centre, radius, Scalar(0,0,255));
+		} 
 		cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
 
 		#ifdef MOTORS_ENABLE
-			int outAngle = steeringAngle * 400;
+			int outAngle = steeringAngle * 100;
 			int outSpeed = speed * 60;
 			cout << "Writing out speed: " << outSpeed << " angle: " << outAngle << endl;
 			control.set_desired_speed(outSpeed);
@@ -199,10 +214,10 @@ int main(int argc, char * argv[])
 
 		// display image on screen
 		#ifdef DISP_TEST
-		imshow("Perspective correction", im);
+			imshow("Perspective correction", im);
 		#endif
 
-
+v
 		// allow for images to be displayed on desktop application
 		#ifdef STILL_IMAGES
 			//cout << "Saving file " << filename.str() << endl;
@@ -220,11 +235,11 @@ int main(int argc, char * argv[])
 	return 0;
 }
 
-void detect_path(Mat grey, float & steeringAngle, float & speed)
+void detect_path(Mat grey, double & steeringAngle, double & speed)
 {
 	//warpPerspective(grey, grey, perspectiveMat, grey.size());
 
-	imshow("Single channel path frame", grey);
+	//imshow("Single channel path frame", grey);
 
 	// get edge binary mask from grey image
 	Mat edges;
@@ -247,13 +262,21 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 	double deltaF = 0;
 	double oldF = 0;
 	double difference = 0;
-
 	steeringAngle = 0;
+	double startAccel = 0;
+
+	//steeringAngle = 0;
 	double maxAccel = 0;
 	int maxRow = height - 1;
 
 	// keeps track of the presence of the left and right edges in each row of any frame
 	bool rightFound, leftFound;
+
+	// corner analysis
+	bool turnInitiated = false;
+	bool turnFinished = false;
+	steering_dir_t steeringDirection = NEUTRAL;
+	list<double> accels;
 
 	// iterate from the bottom (droid) edge of the image to the top
 	for(row = height - 1; row >= 0; --row){
@@ -301,15 +324,51 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 		accel = min(accel, 0.3); accel = max(accel, -0.3);
 		difference += accel;
 
-		if(row > 80){ // some threshold up the image after which sharpness of corners doesn't matter
+		//if(row > 80){ // some threshold up the image after which sharpness of corners doesn't matter
 			if(abs(accel) > maxAccel){
 				maxAccel = abs(accel);
 				maxRow = row;
 			}
-		}
+		//}
 
-		if(row > height - 20){
+		if(!turnFinished){
+
+			if(!turnInitiated && abs(steeringAngle) > 0.5){
+				turnInitiated = true;
+				if(steeringAngle > 0){
+					steeringDirection = RIGHT;
+				} else {
+					steeringDirection = LEFT;
+				}
+			}
+
 			steeringAngle += accel;
+			accels.push_back(accel);
+			if(accels.size() > 5){
+				accels.pop_front();
+			}
+			double sum = 0;
+			for(auto el : accels){
+				sum += el;
+			}
+			sum /= accels.size();
+
+			if(row < height - 120) {
+				turnFinished = true;
+			} else if (sum < 0 && steeringDirection == RIGHT){
+				turnFinished = true;
+			} else if (sum > 0 && steeringDirection == LEFT){
+				turnFinished = true;
+			}
+
+			if(turnFinished){
+				if(steeringAngle != NEUTRAL){
+					steeringAngle /= (height - row);
+					steeringAngle *= 360;
+				} else {
+					steeringAngle = 0;
+				}
+			}
 		}
 
 		// adjust centre of path accordingly
@@ -328,6 +387,8 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 
 	}
 
+	accels.clear();
+
 	// show binary mask
 	#ifdef DISP_TEST
 		imshow("Canny", edges);
@@ -335,7 +396,7 @@ void detect_path(Mat grey, float & steeringAngle, float & speed)
 		imshow("Grey with path superimposed", grey);
 	#endif
 
-	cout << "Max accel: " << maxAccel << " at row " << maxRow << endl;
+	//cout << "Max accel: " << maxAccel << " at row " << maxRow << endl;
 	speed = 1 - maxAccel;
 }
 
@@ -379,6 +440,30 @@ void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 	}
 }
 
+bool handle_remote_switch(DriveControl & control)
+{
+	if(digitalRead(FLAG_PIN) == LOW || digitalRead(REMOTE_PIN) == LOW){
+		// flag or remote has activated, shut off motors
+                control.set_desired_speed(0);
+		control.set_desired_steer(0);
+		sleep(3.0);
+
+		// wait for remote and flag to be reset
+		while(digitalRead(FLAG_PIN) == LOW || digitalRead(REMOTE_PIN) == LOW){}
+
+		// wait for remote to be hit
+		while(digitalRead(REMOTE_PIN) == HIGH){}
+
+		// wait for remote signal to stop
+		while(digitalRead(REMOTE_PIN) == LOW){}
+		sleep(0.1);
+
+		return true;
+	}
+	return false;
+
+}
+
 void camera_setup(camera_t & cam)
 {
 	/**Sets a property in the VideoCapture.
@@ -398,17 +483,11 @@ void camera_setup(camera_t & cam)
 	*/
 
 	// For example
-	#ifndef USB_WEBCAM
-		cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
-		cam.set(CV_CAP_PROP_SATURATION, 70);
-		cam.set(CV_CAP_PROP_FRAME_WIDTH, iw);
-		cam.set(CV_CAP_PROP_FRAME_HEIGHT, ih);
-	#else
-		// does this work?
-		cam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
-		cam.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-		//cam.set(CV_CAP_PROP_EXPOSURE, 10);
-	#endif
+	// does this work?
+	cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
+	cam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+	cam.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+	//cam.set(CV_CAP_PROP_EXPOSURE, 10);
 }
 
 /*

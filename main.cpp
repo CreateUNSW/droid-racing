@@ -112,7 +112,7 @@ int main(int argc, char * argv[])
 
 	#ifdef MOTORS_ENABLE
 		// Wait for remote switch to be pressed twice
-		//while(!handle_remote_switch(control)){}
+		while(!handle_remote_switch(control)){}
 	#endif
 
 	cout << "Entering main loop" << endl;
@@ -125,7 +125,7 @@ int main(int argc, char * argv[])
 
 		#ifdef MOTORS_ENABLE
 			// check for shutoff
-			//handle_remote_switch(control);
+			handle_remote_switch(control);
 		#endif
 
 		// get next image
@@ -451,19 +451,26 @@ void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 bool handle_remote_switch(DriveControl & control)
 {
 	if(digitalRead(FLAG_PIN) == LOW || digitalRead(REMOTE_PIN) == LOW){
+		cout << "Switch detected: stopping motors" << endl;
+		cout << "Flag pin: " << digitalRead(FLAG_PIN) << "  Remote pin: " << digitalRead(REMOTE_PIN) << endl;
 		// flag or remote has activated, shut off motors
                 control.set_desired_speed(0);
 		control.set_desired_steer(0);
-		sleep(3.0);
+		sleep(0.5);
 
 		// wait for remote and flag to be reset
 		while(digitalRead(FLAG_PIN) == LOW || digitalRead(REMOTE_PIN) == LOW){}
 
+		cout << "Switches ready" << endl;
+
 		// wait for remote to be hit
 		while(digitalRead(REMOTE_PIN) == HIGH){}
+		cout << "Remote hit" << endl;
+		sleep(0.1);
 
 		// wait for remote signal to stop
 		while(digitalRead(REMOTE_PIN) == LOW){}
+		cout << "Remote released" << endl;
 		sleep(0.1);
 
 		return true;

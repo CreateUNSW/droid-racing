@@ -2,7 +2,6 @@
 #include <mutex>
 
 #include "ReadImage.hpp"
-#include "TimeUtils.hpp"
 
 // Port for frame by frame controlled streaming
 #define CV_PORT 8889

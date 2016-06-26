@@ -24,6 +24,6 @@ Comment/uncomment relevant hash defines at the top of main.cpp.
 	#define STILL_IMAGES - use if you want to play back the stored images one by one for processing rather than video
 		- note: pay attention to the file format, as defined on line 108 of main.cpp, if you wish to add more images
 
-Navigate to directory with main.cpp. Type './bin/run.exe' and hit enter to run. This is needed for the image read/write file path to work.
+Navigate to directory with main.cpp. Type 'sudo ./bin/run.exe' and hit enter to run. This is needed for the image read/write file path to work.
 
 NOTE: To run with 'servod' not yet running, the system performs a system call as root, and therefore needs to be able to do so without use of a password. Otherwise, the program should be run as the root user.

@@ -45,6 +45,7 @@ typedef VideoCapture camera_t;
 typedef enum {RIGHT, LEFT, NEUTRAL} steering_dir_t;
 
 Mat perspectiveMat;
+const float aperture = 3.0; // makes 2*apeture - 1 scaling
 
 void detect_path(Mat & grey, double & steeringAngle, double & speed);
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
@@ -98,8 +99,6 @@ int main(int argc, char * argv[])
 	#endif
 	double steeringAngle = 0;
 	double speed = 0;
-
-	float aperture= 3.0;
 
 	Point2f src[] = {Point2f(0, 0), Point2f(ROI.width-1, 0), Point2f(aperture*ROI.width, ROI.height-1), Point2f((1-aperture)*ROI.width,ROI.height-1)};
 	Point2f dst[] = {Point2f(0,0), Point2f(ROI.width-1, 0), Point2f(ROI.width-1, ROI.height-1), Point2f(0, ROI.height-1)};
@@ -188,9 +187,11 @@ int main(int argc, char * argv[])
 
 		//imshow("HSV image", imHSV);
 		//cvtColor(im, imGrey, COLOR_BGR2GRAY);
+
+		// determines path and steering angle, returns corrected image
 		detect_path(imGrey, steeringAngle, speed);
 
-		warpPerspective(im, im, perspectiveMat, im.size());
+		//warpPerspective(im, im, perspectiveMat, im.size());
 		if(abs(steeringAngle) > 0.1){
 			int radius = abs(1000 / steeringAngle);
 			Point2i centre;
@@ -199,9 +200,9 @@ int main(int argc, char * argv[])
 			} else {
 				centre = Point2i(iw/2 - 1 - radius, ih - 1);
 			}
-			circle(im, centre, radius, Scalar(0,0,255));
+			//circle(im, centre, radius, Scalar(0,0,255));
 			circle(imGrey, centre, radius, Scalar(255));
-		} 
+		}
 		//cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
 
 		#ifdef MOTORS_ENABLE
@@ -303,6 +304,7 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 
 	// keeps track of the presence of the left and right edges in each row of any frame
 	bool rightFound, leftFound;
+	double perspectiveCalc;
 
 	// corner analysis
 	bool turnInitiated = false;
@@ -313,10 +315,12 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 	// iterate from the bottom (droid) edge of the image to the top
 	for(row = height - 1; row >= 0; --row){
 
+		perspectiveCalc = width*(1-1/(2*aperture-1))*(row/(height-1))/2;
+
 		// start looking for left border from the centre path, iterate outwards
 		leftBorder = centre;
 		leftFound = false;
-		while(leftBorder > 0){
+		while(leftBorder > perspectiveCalc){
 			leftBorder--;
 			if(edges.at<uchar>(row, leftBorder) > 0){
 				// if an edge is found, assume its the border, and break
@@ -327,7 +331,7 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 		// start looking for right border from the centre path, iterate outwards
 		rightBorder = centre;
 		rightFound = false;
-		while(rightBorder < width){
+		while(rightBorder < width-perspectiveCalc){
 			rightBorder++;
 			if(edges.at<uchar>(row, rightBorder) > 0){
 				// if an edge is found, assume its the border, and break

@@ -147,7 +147,7 @@ GetUpdatedImage(std::string &strFile, std::string &strLast, Buffer &buffer)
 	}
 	else
 	{
-		std::cout << "cannot access" << std::endl;
+		std::cout << "cannot access " << strFile.c_str() << std::endl;
 		return false;
 	}
 }
@@ -211,7 +211,7 @@ img_server()
 	dwDiff = 0;
 	//if (args.getIntOption("sr") != -1)
 		//dwDiff = (DWORD)(1000.0/(float)atof(args.getOption("sr")));
-    dwDiff = 50.0
+    	dwDiff = 50.0;
 
 	/* reset all of the client structures */
 	for (i = 0; i < MAXCLIENTS; i++)

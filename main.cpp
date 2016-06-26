@@ -19,7 +19,7 @@
 //#define DISP_TEST
 
 // Define to stream processed footage
-//#define STREAMING
+#define STREAMING
 
 // GPIO and Arduino-like functions
 #include <wiringPi.h>
@@ -203,16 +203,16 @@ int main(int argc, char * argv[])
 			//circle(im, centre, radius, Scalar(0,0,255));
 			circle(imGrey, centre, radius, Scalar(255));
 		}
-		//cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
+		cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
 
 		#ifdef MOTORS_ENABLE
 			int outAngle;
 			if(steeringAngle > 0){
-				outAngle = steeringAngle*40;
+				outAngle = steeringAngle*20; // change this to change right steering
 			} else {
-				outAngle = steeringAngle*70;
+				outAngle = steeringAngle*30; // change this to change left steering
 			}
-			int outSpeed = speed * 20;
+			int outSpeed = speed * 50;	// change this factor to change speed
 			cout << "Writing out speed: " << outSpeed << " angle: " << outAngle << endl;
 			control.set_desired_speed(outSpeed);
 			control.set_desired_steer(outAngle);
@@ -315,12 +315,15 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 	// iterate from the bottom (droid) edge of the image to the top
 	for(row = height - 1; row >= 0; --row){
 
-		perspectiveCalc = width*(1-1/(2*aperture-1))*(row/(height-1))/2;
-
+		perspectiveCalc = width*(1-1/(2*aperture-1))*((double)row/(double)(1.5*height-1))/2;
+		//if(row == 30){
+		//	cout << "Row: " << row << "  perspectivePixels: " << perspectiveCalc << endl;
+		//}
 		// start looking for left border from the centre path, iterate outwards
 		leftBorder = centre;
 		leftFound = false;
 		while(leftBorder > perspectiveCalc){
+		//while(leftBorder > 0){
 			leftBorder--;
 			if(edges.at<uchar>(row, leftBorder) > 0){
 				// if an edge is found, assume its the border, and break
@@ -369,7 +372,7 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 
 		if(!turnFinished){
 
-			if(!turnInitiated && abs(steeringAngle) > 0.5){
+			if(!turnInitiated && abs(steeringAngle) > 0.12){
 				turnInitiated = true;
 				if(steeringAngle > 0){
 					steeringDirection = RIGHT;
@@ -398,12 +401,22 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 			}
 
 			if(turnFinished){
-				if(steeringAngle != NEUTRAL){
+				//if(steeringAngle != NEUTRAL){
 					steeringAngle /= (height - row);
+					steeringAngle *= 10;
+					if(steeringAngle >= 0){
+						steeringAngle *= steeringAngle;
+					} else {
+						steeringAngle *= steeringAngle;
+						steeringAngle = -steeringAngle;
+					}
 					steeringAngle *= 360;
-				} else {
+
+					speed = 1 - 5.5*maxAccel;
+					//speed = 1 - steeringAngle/
+				/*} else {
 					steeringAngle = 0;
-				}
+				}*/
 			}
 		}
 
@@ -433,7 +446,6 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 	#endif
 
 	//cout << "Max accel: " << maxAccel << " at row " << maxRow << endl;
-	speed = 1 - maxAccel;
 }
 
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
@@ -530,6 +542,8 @@ void camera_setup(camera_t & cam)
 	cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
 	cam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cam.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+	cam.set(CV_CAP_PROP_BRIGHTNESS, 70);
+	cam.set(CV_CAP_PROP_SATURATION, 70);
 	//cam.set(CV_CAP_PROP_EXPOSURE, 10);
 }
 

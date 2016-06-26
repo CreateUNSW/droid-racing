@@ -75,6 +75,7 @@ int main(int argc, char * argv[])
 		cam.open(0);
 
 		if (!cam.isOpened()){
+			cout << "Camera not found" << endl;
 			return -1;
 		}
 	#endif
@@ -111,8 +112,10 @@ int main(int argc, char * argv[])
 
 	#ifdef MOTORS_ENABLE
 		// Wait for remote switch to be pressed twice
-		while(!handle_remote_switch(control)){}
+		//while(!handle_remote_switch(control)){}
 	#endif
+
+	cout << "Entering main loop" << endl;
 
 	// main loop
 	while(1)
@@ -122,7 +125,7 @@ int main(int argc, char * argv[])
 
 		#ifdef MOTORS_ENABLE
 			// check for shutoff
-			handle_remote_switch(control);
+			//handle_remote_switch(control);
 		#endif
 
 		// get next image
@@ -188,11 +191,16 @@ int main(int argc, char * argv[])
 			}
 			circle(im, centre, radius, Scalar(0,0,255));
 		} 
-		cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
+		//cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
 
 		#ifdef MOTORS_ENABLE
-			int outAngle = steeringAngle * 100;
-			int outSpeed = speed * 60;
+			int outAngle;
+			if(steeringAngle > 0){
+				outAngle = steeringAngle*40;
+			} else {
+				outAngle = steeringAngle*70;
+			}
+			int outSpeed = speed * 20;
 			cout << "Writing out speed: " << outSpeed << " angle: " << outAngle << endl;
 			control.set_desired_speed(outSpeed);
 			control.set_desired_steer(outAngle);
@@ -217,7 +225,7 @@ int main(int argc, char * argv[])
 			imshow("Perspective correction", im);
 		#endif
 
-v
+
 		// allow for images to be displayed on desktop application
 		#ifdef STILL_IMAGES
 			//cout << "Saving file " << filename.str() << endl;

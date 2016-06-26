@@ -14,7 +14,7 @@
 #define MAX_SPEED 80
 #define MAX_STEER 350
 
-#define DEAD_ZONE 60
+#define DEAD_ZONE 10
 
 #define INCREMENT 5
 #define CONTROL_FREQ 10 // 10 Hz loop
@@ -118,7 +118,7 @@ void DriveControl::set_speed(int speed)
 	}
 
 	// Write out speed servo signal, in reverse
-	servo_write(SPEED_SIGNAL, 1500 + (speed + shift));
+	servo_write(SPEED_SIGNAL, SERVO_MID + (speed + shift));
 	currSpeed = speed;
 }
 
@@ -129,6 +129,6 @@ void DriveControl::set_steer(int steer)
 	steer = max(steer, -MAX_STEER);
 
 	// Write out steer servo signal
-	servo_write(STEER_SIGNAL, 1500 - steer);
+	servo_write(STEER_SIGNAL, SERVO_MID - steer);
 	currAngle = steer;
 }

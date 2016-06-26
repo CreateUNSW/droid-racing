@@ -34,7 +34,7 @@ void servo_init()
 	
 	if ( i > 0 ){
 		cout << "Initialising servo process" << endl;
-		system("sudo ./bin/servod --min=1000us --max=2000us --cycle-time=16200us --step-size=5us");
+		system("sudo ./bin/servod --min=900us --max=1800us --cycle-time=14200us --step-size=5us");
 
 		// Trap exit behaviour
 		signal(SIGINT, signalHandler);
@@ -52,8 +52,8 @@ void servo_init()
 void servo_stop()
 {
 	// Neutral/off position for both servo signals
-	servo_write(0, 1500);
-	servo_write(1, 1500);
+	servo_write(0, SERVO_MID);
+	servo_write(1, SERVO_MID);
 
 	cout << "Stopping servo process" << endl;
 	system("sudo kill $(pgrep servod)");
@@ -71,7 +71,7 @@ void servo_write(int index, int val)
 	assert(servoInitialised);
 
 	// Check for bad input
-	assert(val >= 1000 && val <= 2000);
+	assert(val >= SERVO_MIN && val <= SERVO_MAX);
 
 	// Round to the nearest 10us, for './servod'
 	if (val % 5 > 0) {

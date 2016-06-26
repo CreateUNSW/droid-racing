@@ -86,6 +86,7 @@ int main(int argc, char * argv[])
 	#endif
 
 	#ifdef STREAMING
+		// Turn on streaming capability
 		ReadStream readStream(argc, argv);
 	#endif
 
@@ -187,9 +188,26 @@ int main(int argc, char * argv[])
 
 		// convert image to HSV for processing
 		cvtColor(im, imHSV, COLOR_BGR2HSV);
-
 		// convert hsv image to bgr->greyscale for processing
 		cvtColor(imHSV, imGrey, COLOR_BGR2GRAY);
+
+		// get list of obstacles in our region of interest and plot
+		detect_obstacles(imHSV(ROI), obstacles);
+		for(auto & el : obstacles){
+			el.x += ROI.x;
+			el.y += ROI.y;
+			// draw box around each obstacle
+			//rectangle(im, el, Scalar(255,0,0));
+			rectangle(imGrey, el, Scalar(100));
+
+			// draw triangle leading into obstacle for path calculation
+			int triangleHeight = min(el.width/4, ih - (el.y + el.height));
+			Point2i vertex(el.x + el.width/2, el.y + el.height + triangleHeight);
+			Point2i bottomL(el.x, el.y + el.height - 1);
+			Point2i bottomR = el.br();
+			line(imGrey, bottomL, vertex, Scalar(255));
+			line(imGrey, bottomR, vertex, Scalar(255));
+		}
 
 		// determines path and steering angle, returns corrected image
 		detect_path(imGrey, steeringAngle, speed);
@@ -207,7 +225,7 @@ int main(int argc, char * argv[])
 			circle(imGrey, centre, radius, Scalar(255));
 		}
 
-		//cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
+		//cout << "Steering angle: " << steeringAngle << "	Speed: " << speed << endl;
 
 		#ifdef MOTORS_ENABLE
 			// CHANGE CONSTANTS FOR MODIFIED RESPONSE
@@ -226,15 +244,6 @@ int main(int argc, char * argv[])
 		// measure HSV colour at the centre of the image, for example
 		//cout << imHSV.at<Vec3b>(imHSV.size().width/2,imHSV.size().height/2) << endl;
 
-		// get list of obstacles in our region of interest and plot
-		detect_obstacles(imHSV(ROI), obstacles);
-		for(auto & el : obstacles){
-			el.x += ROI.x;
-			el.y += ROI.y;
-			rectangle(im, el, Scalar(255,0,0));
-			rectangle(imGrey, el, Scalar(100));
-		}
-
 		// print out info
 		//cout << "Image size: " << im.size() << " Loop time: " << millis() - loopTime << endl;
 
@@ -243,7 +252,6 @@ int main(int argc, char * argv[])
 			//imshow("HSV image", imHSV);
 			imshow("Perspective correction", im);
 		#endif
-
 
 		// allow for images to be displayed on desktop application
 		#ifdef STILL_IMAGES
@@ -257,6 +265,7 @@ int main(int argc, char * argv[])
 		#endif
 
 		#ifdef STREAMING
+			// stream modified frame over TCP
 			readStream.writeStream(imGrey);
 		#endif
 
@@ -319,7 +328,7 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 
 		perspectiveDistance = width*(1-1/(2*aperture-1))*((double)row/(double)(1.5*height-1))/2;
 		//if(row == 30){
-		//	cout << "Row: " << row << "  perspectivePixels: " << perspectiveCalc << endl;
+		//	cout << "Row: " << row << "	perspectivePixels: " << perspectiveCalc << endl;
 		//}
 		// start looking for left border from the centre path, iterate outwards
 		leftBorder = centre;
@@ -437,8 +446,8 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 		oldF = ff;
 
 		// draw path pixels on images
-		for(int i = - 1; i <=  1; ++i){
-			grey.at<uchar>(row,  (int)deadCentre + i) = uchar(0);
+		for(int i = - 1; i <=	1; ++i){
+			grey.at<uchar>(row,	(int)deadCentre + i) = uchar(0);
 			//centrePath.at<uchar>(row, (int)centre + i) = uchar(255);
 			grey.at<uchar>(row, (int)centre + i) = uchar(255);
 		}
@@ -460,7 +469,9 @@ void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 	Mat mask;
 
 	// generate mask of purple colours
-	inRange(hsv, Scalar(110, 100, 80), Scalar(130, 255, 255), mask);
+	//inRange(hsv, Scalar(110, 100, 80), Scalar(130, 255, 255), mask);
+	// generate mask of all saturated colours
+	inRange(hsv, Scalar(0, 100, 80), Scalar(255, 255, 255), mask);
 
 	// eliminate noise
 	int n = 2;
@@ -489,9 +500,9 @@ bool handle_remote_switch(DriveControl & control)
 {
 	if(digitalRead(FLAG_PIN) == LOW || digitalRead(REMOTE_PIN) == LOW){
 		cout << "Switch detected: stopping motors" << endl;
-		cout << "Flag pin: " << digitalRead(FLAG_PIN) << "  Remote pin: " << digitalRead(REMOTE_PIN) << endl;
+		cout << "Flag pin: " << digitalRead(FLAG_PIN) << "	Remote pin: " << digitalRead(REMOTE_PIN) << endl;
 		// flag or remote has activated, shut off motors
-                control.set_desired_speed(0);
+		control.set_desired_speed(0);
 		control.set_desired_steer(0);
 		sleep(0.5);
 
@@ -518,29 +529,13 @@ bool handle_remote_switch(DriveControl & control)
 
 void camera_setup(camera_t & cam)
 {
-	/**Sets a property in the VideoCapture.
-	*
-	*
-	* Implemented properties:
-	* CV_CAP_PROP_FRAME_WIDTH,CV_CAP_PROP_FRAME_HEIGHT,
-	* CV_CAP_PROP_FORMAT: CV_8UC1 or CV_8UC3
-	* CV_CAP_PROP_BRIGHTNESS: [0,100]
-	* CV_CAP_PROP_CONTRAST: [0,100]
-	* CV_CAP_PROP_SATURATION: [0,100]
-	* CV_CAP_PROP_GAIN: (iso): [0,100]
-	* CV_CAP_PROP_EXPOSURE: -1 auto. [1,100] shutter speed from 0 to 33ms
-	* CV_CAP_PROP_WHITE_BALANCE_RED_V : [1,100] -1 auto whitebalance
-	* CV_CAP_PROP_WHITE_BALANCE_BLUE_U : [1,100] -1 auto whitebalance
-	*
-	*/
-
-	// For example
-	// does this work?
-	cam.set(CV_CAP_PROP_FORMAT, CV_8UC3);
+	cam.set(CV_CAP_PROP_FORMAT, CV_8UC3); // 3 channel image
 	cam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cam.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-	cam.set(CV_CAP_PROP_BRIGHTNESS, 70);
-	cam.set(CV_CAP_PROP_SATURATION, 70);
+	cam.set(CV_CAP_PROP_BRIGHTNESS, 70); // increased brightness
+	cam.set(CV_CAP_PROP_SATURATION, 70); // increased saturation
+	//cam.set(CV_CAP_PROP_AUTOFOCUS, 0); // set focus to manual
+	//cam.set(CV_CAP_PROP_FOCUS, 255); // need to check if this works
 	//cam.set(CV_CAP_PROP_EXPOSURE, 10);
 }
 

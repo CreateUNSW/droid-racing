@@ -120,7 +120,7 @@ bool
 GetUpdatedImage(std::string &strFile, std::string &strLast, Buffer &buffer)
 {
 	if (!access(strFile.c_str(), 0))
-	{	
+	{
 		buffer.reset();
 		EnterCriticalSection(&csLive);
 		LockAndReadFile(strFile.c_str(), buffer);
@@ -133,7 +133,7 @@ GetUpdatedImage(std::string &strFile, std::string &strLast, Buffer &buffer)
 			buffer.consume(TS_LEN);
 			/*if ((args.getIntOption("sw") != -1) || (args.getIntOption("sh") != -1))
 			{
-				CVSimpleResizeJpeg(buffer, args.getIntOption("sw"), args.getIntOption("sh"), 0); 
+				CVSimpleResizeJpeg(buffer, args.getIntOption("sw"), args.getIntOption("sh"), 0);
 			}*/
 			strLast = achTS;
 			//std::cout << "success!" << std::endl;
@@ -196,7 +196,7 @@ SendStreamFile(Buffer &b, Buffer &img, std::string &strTS)
 int
 img_server()
 {
-	Buffer buffer;	
+	Buffer buffer;
 	bServerRunning = true;
 	SOCKET lsock;
 	char buf[10240];
@@ -210,7 +210,8 @@ img_server()
 	dwLast = 0;
 	dwDiff = 0;
 	//if (args.getIntOption("sr") != -1)
-	//	dwDiff = (DWORD)(1000.0/(float)atof(args.getOption("sr")));
+		//dwDiff = (DWORD)(1000.0/(float)atof(args.getOption("sr")));
+    dwDiff = 50.0
 
 	/* reset all of the client structures */
 	for (i = 0; i < MAXCLIENTS; i++)
@@ -406,6 +407,7 @@ img_server()
 						}
 						SendStreamFile(clients[i].bOut, buffer, strTS);
 						//std::cout << "imgserver sending" << std::endl;
+            Sleep(50);
 					}
 				}
 			}
@@ -432,7 +434,7 @@ void
 StartImageServer(int iPort_)
 {
 	iPort = iPort_;
-	strServFile = strLiveFile;	
+	strServFile = strLiveFile;
 	StartThread(thServer, (void *)server_thread, (void *)0);
 }
 
@@ -443,14 +445,14 @@ StopImageServer()
 	{
 		bServerRunning = false;
 		WaitForThread(thServer);
-	}	
+	}
 }
 
 void
 StartTestImageServer(int iPort_)
 {
 	iPort = iPort_;
-	strServFile = strTestFile;	
+	strServFile = strTestFile;
 	StartThread(thServer, (void *)server_thread, (void *)0);
 }
 
@@ -461,5 +463,5 @@ StopTestImageServer()
 	{
 		bServerRunning = false;
 		WaitForThread(thServer);
-	}	
+	}
 }

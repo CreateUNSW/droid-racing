@@ -9,8 +9,8 @@ typedef int  HANDLE;
 typedef void* LPVOID;
 typedef bool BOOL;
 
-#define FALSE false
-#define TRUE true
+//#define FALSE false
+//#define TRUE true
 
 #define _strnicmp strncasecmp
 #define strnicmp strncasecmp

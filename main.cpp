@@ -18,6 +18,9 @@
 // Define to display all image output
 //#define DISP_TEST
 
+// Define to stream processed footage
+//#define STREAMING
+
 // GPIO and Arduino-like functions
 #include <wiringPi.h>
 
@@ -27,6 +30,7 @@
 
 // Our own headers
 #include "DriveControl.hpp"
+#include "ReadImage.hpp"
 
 // Image width and height constants
 static const int iw = 320;
@@ -42,7 +46,7 @@ typedef enum {RIGHT, LEFT, NEUTRAL} steering_dir_t;
 
 Mat perspectiveMat;
 
-void detect_path(Mat grey, double & steeringAngle, double & speed);
+void detect_path(Mat & grey, double & steeringAngle, double & speed);
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
 bool handle_remote_switch(DriveControl & control);
 void camera_setup(camera_t & cam);
@@ -78,6 +82,10 @@ int main(int argc, char * argv[])
 			cout << "Camera not found" << endl;
 			return -1;
 		}
+	#endif
+
+	#ifdef STREAMING
+		ReadStream readStream(argc, argv);
 	#endif
 
 	// variables for iterating through sample images
@@ -169,7 +177,7 @@ int main(int argc, char * argv[])
 			imshow("Camera", im);
 		#endif
 
-		warpPerspective(im, im, perspectiveMat, im.size());
+		//warpPerspective(im, im, perspectiveMat, im.size());
 
 		// convert image to HSV for processing
 		cvtColor(im, imHSV, COLOR_BGR2HSV);
@@ -180,7 +188,9 @@ int main(int argc, char * argv[])
 
 		//imshow("HSV image", imHSV);
 		//cvtColor(im, imGrey, COLOR_BGR2GRAY);
-		detect_path(imGrey(ROI), steeringAngle, speed);
+		detect_path(imGrey, steeringAngle, speed);
+
+		warpPerspective(im, im, perspectiveMat, im.size());
 		if(abs(steeringAngle) > 0.1){
 			int radius = abs(1000 / steeringAngle);
 			Point2i centre;
@@ -190,6 +200,7 @@ int main(int argc, char * argv[])
 				centre = Point2i(iw/2 - 1 - radius, ih - 1);
 			}
 			circle(im, centre, radius, Scalar(0,0,255));
+			circle(imGrey, centre, radius, Scalar(255));
 		} 
 		//cout << "Steering angle: " << steeringAngle << "  Speed: " << speed << endl;
 
@@ -237,13 +248,23 @@ int main(int argc, char * argv[])
 			waitKey(5);
 		#endif
 
+		#ifdef STREAMING
+			readStream.writeStream(imGrey);
+			//imwrite(filename.str(), imPath);
+			//cout << "Wrote out image" << endl;
+		#endif
+
 		// clear vector after use
 		obstacles.clear();
+
+		// print out info
+                cout << "Image size: " << im.size() << " Loop time: " << millis() - loopTime << endl;
+
 	}
 	return 0;
 }
 
-void detect_path(Mat grey, double & steeringAngle, double & speed)
+void detect_path(Mat & grey, double & steeringAngle, double & speed)
 {
 	//warpPerspective(grey, grey, perspectiveMat, grey.size());
 
@@ -254,6 +275,9 @@ void detect_path(Mat grey, double & steeringAngle, double & speed)
 
 	/** PLEASE READ UP ON CANNY **/
 	Canny(grey, edges, 80, 240); // note edge thresholding numbers
+
+	warpPerspective(edges, edges, perspectiveMat, edges.size());
+	warpPerspective(grey, grey, perspectiveMat, grey.size());
 
 
 	// Path matrix, which calculated path will be drawn on

@@ -24,14 +24,15 @@
 typedef int SOCKET;
 
 #include "thread.h"
-#include "utils.h"
+//#include "utils.h"
 #include "buffer.h"
 #include "lock.h"
 #include "wininc.h"
-#include "args.h"
-#include "jpeg.h"
+//#include "args.h"
+//#include "jpeg.h"
+#include <iostream>
 
-extern Args args;
+//extern Args args;
 
 #ifndef INADDR_NONE
 #define INADDR_NONE 0xffffffff
@@ -127,23 +128,26 @@ GetUpdatedImage(std::string &strFile, std::string &strLast, Buffer &buffer)
 		char achTS[30];
 		memcpy(achTS, buffer.getData(), TS_LEN);
 		achTS[TS_LEN] = 0;
-		if (strcmp(achTS, strLast.c_str()))
-		{
+		//if (strcmp(achTS, strLast.c_str()))
+		//{
 			buffer.consume(TS_LEN);
-			if ((args.getIntOption("sw") != -1) || (args.getIntOption("sh") != -1))
+			/*if ((args.getIntOption("sw") != -1) || (args.getIntOption("sh") != -1))
 			{
 				CVSimpleResizeJpeg(buffer, args.getIntOption("sw"), args.getIntOption("sh"), 0); 
-			}
+			}*/
 			strLast = achTS;
+			//std::cout << "success!" << std::endl;
 			return true;
-		}
+		/*}
 		else
 		{
+			std::cout << "cannot read" << std::endl;
 			return false;
-		}
+		}*/
 	}
 	else
 	{
+		std::cout << "cannot access" << std::endl;
 		return false;
 	}
 }
@@ -205,8 +209,8 @@ img_server()
 	dwNow = 0;
 	dwLast = 0;
 	dwDiff = 0;
-	if (args.getIntOption("sr") != -1)
-		dwDiff = (DWORD)(1000.0/(float)atof(args.getOption("sr")));
+	//if (args.getIntOption("sr") != -1)
+	//	dwDiff = (DWORD)(1000.0/(float)atof(args.getOption("sr")));
 
 	/* reset all of the client structures */
 	for (i = 0; i < MAXCLIENTS; i++)
@@ -386,8 +390,10 @@ img_server()
 		dwNow = GetTickCount();
 		if ((dwNow - dwLast) >= dwDiff)
 		{
+			//std::cout << "file: " << strServFile << std::endl;
 			if (GetUpdatedImage(strServFile, strTS, buffer))
 			{
+				//std::cout << "this one" << std::endl;
 				dwLast = GetTickCount();
 				for (i = 0; i < MAXCLIENTS; i++)
 				{
@@ -399,6 +405,7 @@ img_server()
 							clients[i].header = true;
 						}
 						SendStreamFile(clients[i].bOut, buffer, strTS);
+						//std::cout << "imgserver sending" << std::endl;
 					}
 				}
 			}

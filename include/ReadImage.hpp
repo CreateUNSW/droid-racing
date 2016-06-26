@@ -30,27 +30,20 @@ class ReadStream {
 public:
 	ReadStream(int argc, char **argv);
 	~ReadStream();
-	
-	void writeStream(Mat img);
-	void writeStream();
 
-	void retrieveImage(Mat & img);
+	void writeStream(Mat img);
+
 
 private:
 	void start(int argc, char **argv);
-	void run();
-	bool getLiveImage();
-	bool loadCV(Mat & img);
 
-	string inFile;
+	//string inFile;
 	string outFile;
 
 	string strTS;
 	Buffer *b;
 	Buffer * b_out;
-	thread * t;
-
-	Mat newImg;
+	//thread * t;
 };
 
 #endif

@@ -24,15 +24,14 @@
 typedef int SOCKET;
 
 #include "thread.h"
-//#include "utils.h"
+#include "utils.h"
 #include "buffer.h"
 #include "lock.h"
 #include "wininc.h"
-//#include "args.h"
-//#include "jpeg.h"
-#include <iostream>
+#include "args.h"
+#include "jpeg.h"
 
-//extern Args args;
+extern Args args;
 
 #ifndef INADDR_NONE
 #define INADDR_NONE 0xffffffff
@@ -128,26 +127,23 @@ GetUpdatedImage(std::string &strFile, std::string &strLast, Buffer &buffer)
 		char achTS[30];
 		memcpy(achTS, buffer.getData(), TS_LEN);
 		achTS[TS_LEN] = 0;
-		//if (strcmp(achTS, strLast.c_str()))
-		//{
+		if (strcmp(achTS, strLast.c_str()))
+		{
 			buffer.consume(TS_LEN);
-			/*if ((args.getIntOption("sw") != -1) || (args.getIntOption("sh") != -1))
+			if ((args.getIntOption("sw") != -1) || (args.getIntOption("sh") != -1))
 			{
 				CVSimpleResizeJpeg(buffer, args.getIntOption("sw"), args.getIntOption("sh"), 0);
-			}*/
+			}
 			strLast = achTS;
-			//std::cout << "success!" << std::endl;
 			return true;
-		/*}
+		}
 		else
 		{
-			std::cout << "cannot read" << std::endl;
 			return false;
-		}*/
+		}
 	}
 	else
 	{
-		std::cout << "cannot access " << strFile.c_str() << std::endl;
 		return false;
 	}
 }
@@ -185,11 +181,11 @@ SendStreamFile(Buffer &b, Buffer &img, std::string &strTS)
 	cl += img.Size();
 	cl += 22;
 	sprintf(achCache, "%x\r\n", cl);
-	b.Add(achCache, strlen(achCache));
-	b.Add(achHeader, strlen(achHeader));
+	//b.Add(achCache, strlen(achCache));
+	//b.Add(achHeader, strlen(achHeader));
 	b.Add(img.getData(), img.Size());
-	sprintf(achHeader, "--boundarydonotcross%s%s", STREAMEOL, STREAMEOL);
-	b.Add(achHeader, strlen(achHeader));
+	//sprintf(achHeader, "--boundarydonotcross%s%s", STREAMEOL, STREAMEOL);
+	//b.Add(achHeader, strlen(achHeader));
 	return true;
 }
 
@@ -209,9 +205,8 @@ img_server()
 	dwNow = 0;
 	dwLast = 0;
 	dwDiff = 0;
-	//if (args.getIntOption("sr") != -1)
-		//dwDiff = (DWORD)(1000.0/(float)atof(args.getOption("sr")));
-    	dwDiff = 50.0;
+	if (args.getIntOption("sr") != -1)
+		dwDiff = (DWORD)(1000.0/(float)atof(args.getOption("sr")));
 
 	/* reset all of the client structures */
 	for (i = 0; i < MAXCLIENTS; i++)
@@ -391,10 +386,8 @@ img_server()
 		dwNow = GetTickCount();
 		if ((dwNow - dwLast) >= dwDiff)
 		{
-			//std::cout << "file: " << strServFile << std::endl;
 			if (GetUpdatedImage(strServFile, strTS, buffer))
 			{
-				//std::cout << "this one" << std::endl;
 				dwLast = GetTickCount();
 				for (i = 0; i < MAXCLIENTS; i++)
 				{
@@ -402,12 +395,10 @@ img_server()
 					{
 						if (!clients[i].header)
 						{
-							SendStreamHeader(clients[i].bOut);
+							//SendStreamHeader(clients[i].bOut);
 							clients[i].header = true;
 						}
 						SendStreamFile(clients[i].bOut, buffer, strTS);
-						//std::cout << "imgserver sending" << std::endl;
-            Sleep(50);
 					}
 				}
 			}

@@ -5,6 +5,7 @@
 #include <thread>
 #include <chrono>
 #include <iostream>
+#include <mutex>
 
 #include <wiringPi.h>
 
@@ -12,15 +13,17 @@
 #define STEER_SIGNAL 1
 
 #define MAX_SPEED 80
-#define MAX_STEER 350
+#define MAX_STEER 400
 
 #define DEAD_ZONE_SPEED 10
 #define DEAD_ZONE_STEER 10
 
-#define INCREMENT 5
+#define INCREMENT 10
 #define CONTROL_FREQ 10 // 10 Hz loop
 
 using namespace std;
+
+mutex emergencyLock;
 
 DriveControl::DriveControl()
 {
@@ -70,6 +73,8 @@ void DriveControl::run()
 			time_ms += 1000/CONTROL_FREQ;
 		}
 
+		emergencyLock.lock();
+
 		if(desiredSpeed > currSpeed){
 			speed = min(currSpeed + INCREMENT, desiredSpeed);
 			set_speed(speed);
@@ -86,6 +91,8 @@ void DriveControl::run()
 			angle = max(currAngle - INCREMENT*30, desiredAngle);
 			set_steer(angle);
 		}
+
+		emergencyLock.unlock();
 	}
 }
 
@@ -140,3 +147,18 @@ void DriveControl::set_steer(int steer)
 	servo_write(STEER_SIGNAL, SERVO_MID - (steer + shift));
 	currAngle = steer;
 }
+
+void DriveControl::emergency_stop()
+{
+	// Make sure that thread doesn't overwrite during
+	emergencyLock.lock();
+
+	set_desired_speed(0);
+	set_desired_steer(0);
+	set_speed(0);
+	set_steer(0);
+
+	emergencyLock.unlock();
+}
+
+

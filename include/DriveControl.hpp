@@ -18,6 +18,9 @@ public:
 	void set_desired_speed(int speed);
 	void set_desired_steer(int angle);
 
+	// Emergency stop function
+	void emergency_stop();
+
 private:
 	// Signal write functions
 	void set_speed(int speed);

@@ -13,7 +13,7 @@
 //#define STILL_IMAGES
 
 // Define if motors are to be driven
-#define MOTORS_ENABLE
+//#define MOTORS_ENABLE
 
 // Define to display all image output
 //#define DISP_TEST
@@ -87,6 +87,7 @@ int main(int argc, char * argv[])
 
 	#ifdef STREAMING
 		// Turn on streaming capability
+		cout << "Turning on streaming" << endl;
 		ReadStream readStream(argc, argv);
 	#endif
 
@@ -109,6 +110,7 @@ int main(int argc, char * argv[])
 	perspectiveMat = getPerspectiveTransform(src, dst);
 
 	// set up use of GPIO
+	cout << "Setting up GPIO" << endl;
 	wiringPiSetup();
 
 	// set IO for flag trigger
@@ -192,22 +194,25 @@ int main(int argc, char * argv[])
 		cvtColor(imHSV, imGrey, COLOR_BGR2GRAY);
 
 		// get list of obstacles in our region of interest and plot
-		detect_obstacles(imHSV(ROI), obstacles);
+		detect_obstacles(imHSV, obstacles);
 		for(auto & el : obstacles){
-			el.x += ROI.x;
-			el.y += ROI.y;
+			//el.x += ROI.x;
+			//el.y += ROI.y;
+
 			// draw box around each obstacle
 			//rectangle(im, el, Scalar(255,0,0));
-			rectangle(imGrey, el, Scalar(100));
+			//rectangle(imGrey, el, Scalar(100));
 
 			// draw triangle leading into obstacle for path calculation
-			int triangleHeight = min(el.width/4, ih - (el.y + el.height));
+			int triangleHeight = min(el.width/2, ih - (el.y + el.height));
 			Point2i vertex(el.x + el.width/2, el.y + el.height + triangleHeight);
 			Point2i bottomL(el.x, el.y + el.height - 1);
 			Point2i bottomR = el.br();
-			line(imGrey, bottomL, vertex, Scalar(255));
-			line(imGrey, bottomR, vertex, Scalar(255));
+			line(imGrey, bottomL, vertex, Scalar(255), 2);
+			line(imGrey, bottomR, vertex, Scalar(255), 2);
 		}
+
+		//cout << "Obstacles: " << obstacles.size() << endl;
 
 		// determines path and steering angle, returns corrected image
 		detect_path(imGrey, steeringAngle, speed);
@@ -234,6 +239,9 @@ int main(int argc, char * argv[])
 				outAngle = steeringAngle * 20; // right steering constant [change this]
 			} else {
 				outAngle = steeringAngle * 30; // left steering constant [change this]
+				if(outAngle > 250){
+					outAngle = 400;
+				}
 			}
 			int outSpeed = speed * 50;	// speed constant [change this]
 			cout << "Writing out speed: " << outSpeed << " angle: " << outAngle << endl;
@@ -296,8 +304,8 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 
 	// Integer variables for features of image
 	int leftBorder, rightBorder, row;
-	int height = centrePath.size().height;
-	int width = centrePath.size().width;
+	int height = grey.size().height;
+	int width = grey.size().width;
 
 	// effect of perspective increases for further away objects
 	double perspectiveDistance;
@@ -327,6 +335,7 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 	for(row = height - 1; row >= 0; --row){
 
 		perspectiveDistance = width*(1-1/(2*aperture-1))*((double)row/(double)(1.5*height-1))/2;
+		//perspectiveDistance = 0;
 		//if(row == 30){
 		//	cout << "Row: " << row << "	perspectivePixels: " << perspectiveCalc << endl;
 		//}
@@ -408,7 +417,7 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 			meanAccel /= accels.size();
 
 			// look for the end of a turn
-			if(row < height - 120) {
+			if(row < height - 200) {
 				// no turn near
 				turnFinished = true;
 			} else if (meanAccel < 0 && steeringDirection == RIGHT){
@@ -431,10 +440,12 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 					steeringAngle *= steeringAngle;
 					steeringAngle = -steeringAngle;
 				}
+				//steeringAngle *= (steeringAngle * steeringAngle);
 				steeringAngle *= 360;
 
 				// slow down speed based on the maximum acceleration in the turn
-				speed = 1 - 6.5*maxAccel;
+				speed = 1 - 5*maxAccel;
+				speed = min(0.75, speed);
 			}
 		}
 
@@ -471,26 +482,37 @@ void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 	// generate mask of purple colours
 	//inRange(hsv, Scalar(110, 100, 80), Scalar(130, 255, 255), mask);
 	// generate mask of all saturated colours
-	inRange(hsv, Scalar(0, 100, 80), Scalar(255, 255, 255), mask);
+	inRange(hsv, Scalar(0, 50, 50), Scalar(255, 255, 255), mask);
 
 	// eliminate noise
 	int n = 2;
 	Mat element = getStructuringElement(MORPH_RECT, Size(n*2+1, n*2+1), Point(n, n));
 	morphologyEx(mask, mask, MORPH_OPEN, element);
 
+	//imshow("Obstacle mask", mask);
+
 	// variables for defining objects
 	vector<vector<Point>> contours;
-	vector<vector<Point>> contours_poly( contours.size() );
 	vector<Vec4i> hierarchy;
 
 	// draw convex hulls around detected contours
 	findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );
+	for(size_t i = 0; i < contours.size(); ++i){
+		drawContours(mask, contours, (int)i, Scalar(255), CV_FILLED);
+	}
+	n = 4;
+	element = getStructuringElement(MORPH_RECT, Size(n*2+1, n*2+1), Point(n,n));
+	erode(mask, mask, element);
+
+	findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0,0) );
+
+	//vector<vector<Point>> contours_poly( contours.size() );
 
 	// get rectangles of large obstacles
 	for(size_t i = 0; i < contours.size(); ++i){
-		approxPolyDP( Mat(contours[i]), contours_poly[i], 3, true);
-		Rect object = boundingRect( Mat(contours_poly[i]) );
-		if(object.width > iw/10 && object.height > ih/10){
+		//approxPolyDP( Mat(contours[i]), contours_poly[i], 3, true);
+		if(contourArea(contours[i]) > 2000){
+			Rect object = boundingRect( Mat(contours[i]) );
 			obj.push_back(object);
 		}
 	}
@@ -502,9 +524,8 @@ bool handle_remote_switch(DriveControl & control)
 		cout << "Switch detected: stopping motors" << endl;
 		cout << "Flag pin: " << digitalRead(FLAG_PIN) << "	Remote pin: " << digitalRead(REMOTE_PIN) << endl;
 		// flag or remote has activated, shut off motors
-		control.set_desired_speed(0);
-		control.set_desired_steer(0);
-		sleep(0.5);
+		control.emergency_stop();
+		sleep(1.0);
 
 		// wait for remote and flag to be reset
 		while(digitalRead(FLAG_PIN) == LOW || digitalRead(REMOTE_PIN) == LOW){}
@@ -532,8 +553,8 @@ void camera_setup(camera_t & cam)
 	cam.set(CV_CAP_PROP_FORMAT, CV_8UC3); // 3 channel image
 	cam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cam.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-	cam.set(CV_CAP_PROP_BRIGHTNESS, 70); // increased brightness
-	cam.set(CV_CAP_PROP_SATURATION, 70); // increased saturation
+	cam.set(CV_CAP_PROP_BRIGHTNESS, 80); // increased brightness
+	cam.set(CV_CAP_PROP_SATURATION, 80); // increased saturation
 	//cam.set(CV_CAP_PROP_AUTOFOCUS, 0); // set focus to manual
 	//cam.set(CV_CAP_PROP_FOCUS, 255); // need to check if this works
 	//cam.set(CV_CAP_PROP_EXPOSURE, 10);

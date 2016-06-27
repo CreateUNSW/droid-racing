@@ -32,6 +32,7 @@ typedef int SOCKET;
 #include "jpeg.h"
 
 #include "ReadImage.hpp"
+#include <iostream>
 
 extern Args args;
 
@@ -114,10 +115,10 @@ TCPSendMJPEGHeaders(Buffer &b)
 
 //2016-12-12 12-12-12-000
 #define TS_LEN 23
-extern CRITICAL_SECTION csLive;
-extern CRITICAL_SECTION csRec;
+//extern CRITICAL_SECTION csLive;
+//extern CRITICAL_SECTION csRec;
 
-bool
+/*bool
 GetUpdatedImage(std::string &strFile, std::string &strLast, Buffer &buffer)
 {
 	if (!access(strFile.c_str(), 0))
@@ -148,7 +149,7 @@ GetUpdatedImage(std::string &strFile, std::string &strLast, Buffer &buffer)
 	{
 		return false;
 	}
-}
+}*/
 
 int
 SendStreamHeader(Buffer &b)
@@ -183,11 +184,11 @@ SendStreamFile(Buffer &b, Buffer &img, std::string &strTS)
 	cl += img.Size();
 	cl += 22;
 	sprintf(achCache, "%x\r\n", cl);
-	//b.Add(achCache, strlen(achCache));
-	//b.Add(achHeader, strlen(achHeader));
+	b.Add(achCache, strlen(achCache));
+	b.Add(achHeader, strlen(achHeader));
 	b.Add(img.getData(), img.Size());
-	//sprintf(achHeader, "--boundarydonotcross%s%s", STREAMEOL, STREAMEOL);
-	//b.Add(achHeader, strlen(achHeader));
+	sprintf(achHeader, "--boundarydonotcross%s%s", STREAMEOL, STREAMEOL);
+	b.Add(achHeader, strlen(achHeader));
 	return true;
 }
 
@@ -206,7 +207,7 @@ img_server()
 
 	dwNow = 0;
 	dwLast = 0;
-	dwDiff = 0;
+	dwDiff = 50.0;//0;
 	if (args.getIntOption("sr") != -1)
 		dwDiff = (DWORD)(1000.0/(float)atof(args.getOption("sr")));
 
@@ -390,6 +391,7 @@ img_server()
 		{
 			if (getImageBuffer(buffer))
 			{
+				//std::cout << "Got image!" << std::endl;
 				dwLast = GetTickCount();
 				for (i = 0; i < MAXCLIENTS; i++)
 				{
@@ -397,7 +399,7 @@ img_server()
 					{
 						if (!clients[i].header)
 						{
-							//SendStreamHeader(clients[i].bOut);
+							SendStreamHeader(clients[i].bOut);
 							clients[i].header = true;
 						}
 						SendStreamFile(clients[i].bOut, buffer, strTS);

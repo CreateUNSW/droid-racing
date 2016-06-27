@@ -88,10 +88,12 @@ bool getImageBuffer(Buffer & ret)
 {
 	buffLock.lock();
 	if(!imReady){
+		buffLock.unlock();
 		return false;
 	}
 	ret.reset();
-	ret.Add(streamBuffer.data(), streamBuffer.size());
+	ret.Add(streamBuffer.getData(), streamBuffer.Size());
+	imReady = false;
 	buffLock.unlock();
 	return true;
 }

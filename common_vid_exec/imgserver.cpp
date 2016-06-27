@@ -185,11 +185,11 @@ SendStreamFile(Buffer &b, Buffer &img, std::string &strTS)
 	cl += img.Size();
 	cl += 22;
 	sprintf(achCache, "%x\r\n", cl);
-	//b.Add(achCache, strlen(achCache));
-	//b.Add(achHeader, strlen(achHeader));
+	b.Add(achCache, strlen(achCache));
+	b.Add(achHeader, strlen(achHeader));
 	b.Add(img.getData(), img.Size());
-	//sprintf(achHeader, "--boundarydonotcross%s%s", STREAMEOL, STREAMEOL);
-	//b.Add(achHeader, strlen(achHeader));
+	sprintf(achHeader, "--boundarydonotcross%s%s", STREAMEOL, STREAMEOL);
+	b.Add(achHeader, strlen(achHeader));
 	return true;
 }
 
@@ -402,7 +402,7 @@ img_server()
 					{
 						if (!clients[i].header)
 						{
-							//SendStreamHeader(clients[i].bOut);
+							SendStreamHeader(clients[i].bOut);
 							clients[i].header = true;
 						}
 						SendStreamFile(clients[i].bOut, buffer, strTS);

@@ -13,7 +13,7 @@
 //#define STILL_IMAGES
 
 // Define if motors are to be driven
-//#define MOTORS_ENABLE
+#define MOTORS_ENABLE
 
 // Define to display all image output
 //#define DISP_TEST
@@ -131,7 +131,7 @@ int main(int argc, char * argv[])
 
 	#ifdef MOTORS_ENABLE
 		// Wait for remote switch to be pressed twice
-		//while(!handle_remote_switch(control)){}
+		while(!handle_remote_switch(control)){}
 	#endif
 
 	cout << "Entering main loop" << endl;
@@ -144,7 +144,7 @@ int main(int argc, char * argv[])
 
 		#ifdef MOTORS_ENABLE
 			// check for shutoff
-			//handle_remote_switch(control);
+			handle_remote_switch(control);
 		#endif
 
 		// get next image
@@ -196,8 +196,8 @@ int main(int argc, char * argv[])
 		// convert hsv image to bgr->greyscale for processing
 		cvtColor(imHSV, imGrey, COLOR_BGR2GRAY);
 
-		colour_t colourLine = sharp_corner(imHSV);
-		//colour_t colourLine = NONE;
+		//colour_t colourLine = sharp_corner(imHSV);
+		colour_t colourLine = NONE;
 
 		// get list of obstacles in our region of interest and plot
 		detect_obstacles(imHSV, obstacles);

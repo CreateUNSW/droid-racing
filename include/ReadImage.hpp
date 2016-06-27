@@ -26,6 +26,8 @@
 using namespace std;
 using namespace cv;
 
+bool getImageBuffer(Buffer & ret);
+
 class ReadStream {
 public:
 	ReadStream(int argc, char **argv);

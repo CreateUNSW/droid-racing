@@ -31,7 +31,10 @@ extern int InitSignal();
 extern void StartTestImageServer(int iPort_);
 extern void StopTestImageServer();
 
-/**END Lloyd's global and external variables**/
+mutex buffLock;
+bool imReady = false;
+
+Buffer streamBuffer;
 
 /**
 	Constructor: initialise filenames, buffers, start the threading
@@ -72,14 +75,25 @@ void ReadStream::writeStream(Mat img)
 	p.push_back(100);
 	vector<uchar> vout;
 	imencode(".jpg", img, vout, p);
+	buffLock.lock();
+	//b->reset();
+	//b->Add((char *)vout.data(), vout.size());
+	streamBuffer.reset();
+	streamBuffer.Add((char *)vout.data(), vout.size());
+	imReady = true;
+	buffLock.unlock();
+}
 
-	b->reset();
-	b->Add((char *)vout.data(), vout.size());
-
-	EnterCriticalSection(&csLive);
-
-	LockAndWriteFile(outFile.c_str(), *b, strTS);
-	LeaveCriticalSection(&csLive);
+bool getImageBuffer(Buffer & ret)
+{
+	buffLock.lock();
+	if(!imReady){
+		return false;
+	}
+	ret.reset();
+	ret.Add(streamBuffer.data(), streamBuffer.size());
+	buffLock.unlock();
+	return true;
 }
 
 /**
@@ -126,7 +140,7 @@ void ReadStream::start(int argc, char **argv)
 		args.usage();
 		exit(1);
 	}
-	
+
 	InitSignal();
 	int sig;
 	prctl(PR_GET_PDEATHSIG, &sig);

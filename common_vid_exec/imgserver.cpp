@@ -31,6 +31,8 @@ typedef int SOCKET;
 #include "args.h"
 #include "jpeg.h"
 
+#include "ReadImage.hpp"
+
 extern Args args;
 
 #ifndef INADDR_NONE
@@ -386,7 +388,7 @@ img_server()
 		dwNow = GetTickCount();
 		if ((dwNow - dwLast) >= dwDiff)
 		{
-			if (GetUpdatedImage(strServFile, strTS, buffer))
+			if (getImageBuffer(buffer))
 			{
 				dwLast = GetTickCount();
 				for (i = 0; i < MAXCLIENTS; i++)

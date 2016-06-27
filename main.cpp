@@ -44,6 +44,7 @@ static string image_path = "./sample_images/";
 
 typedef VideoCapture camera_t;
 typedef enum {RIGHT, LEFT, NEUTRAL} steering_dir_t;
+typedef enum {YELLOW, BLUE, PURPLE, NONE} colour_t;
 
 // Globals for correcting oblique perspective
 Mat perspectiveMat;
@@ -51,6 +52,7 @@ const float aperture = 3.0; // makes 2*apeture - 1 scaling
 
 void detect_path(Mat & grey, double & steeringAngle, double & speed);
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj);
+colour_t sharp_corner(Mat middle);
 bool handle_remote_switch(DriveControl & control);
 void camera_setup(camera_t & cam);
 void sleep(double seconds);
@@ -67,7 +69,7 @@ int main(int argc, char * argv[])
 	vector<Rect2i> obstacles;
 
 	// Region of interest for scanning for obstacles
-	Rect2i ROI(0, ih/2 - 1, iw, ih/2);
+	//Rect2i middleROI(2*iw/5, ih/3-1, iw/5, 2*ih/3);
 
 	#ifndef STILL_IMAGES
 		// Instantiate camera object
@@ -103,6 +105,7 @@ int main(int argc, char * argv[])
 	// Instance variables for driving steering and speed
 	double steeringAngle = 0;
 	double speed = 0;
+	int outAngle, outSpeed;
 
 	// perspective transformation matrix based on aperture skew
 	Point2f src[] = {Point2f(0, 0), Point2f(iw - 1, 0), Point2f(aperture * iw, ih - 1), Point2f((1 - aperture) * iw, ih - 1)};
@@ -128,7 +131,7 @@ int main(int argc, char * argv[])
 
 	#ifdef MOTORS_ENABLE
 		// Wait for remote switch to be pressed twice
-		while(!handle_remote_switch(control)){}
+		//while(!handle_remote_switch(control)){}
 	#endif
 
 	cout << "Entering main loop" << endl;
@@ -141,7 +144,7 @@ int main(int argc, char * argv[])
 
 		#ifdef MOTORS_ENABLE
 			// check for shutoff
-			handle_remote_switch(control);
+			//handle_remote_switch(control);
 		#endif
 
 		// get next image
@@ -193,6 +196,9 @@ int main(int argc, char * argv[])
 		// convert hsv image to bgr->greyscale for processing
 		cvtColor(imHSV, imGrey, COLOR_BGR2GRAY);
 
+		colour_t colourLine = sharp_corner(imHSV);
+		//colour_t colourLine = NONE;
+
 		// get list of obstacles in our region of interest and plot
 		detect_obstacles(imHSV, obstacles);
 		for(auto & el : obstacles){
@@ -229,12 +235,10 @@ int main(int argc, char * argv[])
 			circle(im, centre, radius, Scalar(0,0,255));
 			circle(imGrey, centre, radius, Scalar(255));
 		}
-
 		//cout << "Steering angle: " << steeringAngle << "	Speed: " << speed << endl;
 
-		#ifdef MOTORS_ENABLE
-			// CHANGE CONSTANTS FOR MODIFIED RESPONSE
-			int outAngle;
+		// CHANGE CONSTANTS FOR MODIFIED RESPONSE
+		if(colourLine == NONE){
 			if(steeringAngle > 0){
 				outAngle = steeringAngle * 20; // right steering constant [change this]
 			} else {
@@ -243,7 +247,18 @@ int main(int argc, char * argv[])
 					outAngle = 400;
 				}
 			}
-			int outSpeed = speed * 50;	// speed constant [change this]
+			outSpeed = speed * 50;	// speed constant [change this]
+		} else if(colourLine == YELLOW){
+			outAngle = -500;
+			outSpeed = 15;
+			cout << "Yellow line in front!" << endl;
+		} else if(colourLine == BLUE){
+			outAngle = 500;
+			outSpeed = 15;
+			cout << "Blue line in front!" << endl;
+		}
+
+		#ifdef MOTORS_ENABLE
 			cout << "Writing out speed: " << outSpeed << " angle: " << outAngle << endl;
 			control.set_desired_speed(outSpeed);
 			control.set_desired_steer(outAngle);
@@ -475,6 +490,52 @@ void detect_path(Mat & grey, double & steeringAngle, double & speed)
 	//cout << "Max accel: " << maxAccel << " at row " << maxRow << endl;
 }
 
+colour_t sharp_corner(Mat hsv)
+{
+	Mat maskYellow;
+	Mat checkYellow = hsv(Rect2i(0,0, iw/3, ih));
+	inRange(checkYellow, Scalar(0, 60, 60), Scalar(60, 255, 255), maskYellow);
+
+	//int n = 2;
+	//Mat element = getStructuringElement(MORPH_RECT, Size(n*2+1, n*2+1), Point(n, n));
+        //morphologyEx(maskYellow, maskYellow, MORPH_OPEN, element);
+
+	vector<vector<Point>> contours;
+	vector<Vec4i> hierarchy;
+
+	findContours(maskYellow, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0,0) );
+
+        // get rectangles of large obstacles
+        for(size_t i = 0; i < contours.size(); ++i){
+                if(contourArea(contours[i]) > 100){
+                        return YELLOW;
+                }
+        }
+
+	Mat maskBlue;
+
+	contours.clear();
+	hierarchy.clear();
+
+	Mat checkBlue = hsv(Rect2i(2*iw/3-1, 0, iw/3, ih));
+	inRange(checkBlue, Scalar(100,80,60), Scalar(155, 255, 255), maskBlue);
+
+	//morphologyEx(maskBlue, maskBlue, MORPH_OPEN, element);
+
+	findContours(maskBlue, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0,0) );
+
+	for(size_t i = 0; i < contours.size(); ++i){
+                if(contourArea(contours[i]) > 100){
+                        return BLUE;
+                }
+        }
+
+
+	return NONE;
+
+}
+
+
 void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 {
 	Mat mask;
@@ -500,9 +561,9 @@ void detect_obstacles(Mat hsv, vector<Rect2i> & obj)
 	for(size_t i = 0; i < contours.size(); ++i){
 		drawContours(mask, contours, (int)i, Scalar(255), CV_FILLED);
 	}
-	n = 4;
-	element = getStructuringElement(MORPH_RECT, Size(n*2+1, n*2+1), Point(n,n));
-	erode(mask, mask, element);
+	//n = 4;
+	//element = getStructuringElement(MORPH_RECT, Size(n*2+1, n*2+1), Point(n,n));
+	//erode(mask, mask, element);
 
 	findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0,0) );
 

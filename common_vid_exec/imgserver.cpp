@@ -24,17 +24,14 @@
 typedef int SOCKET;
 
 #include "thread.h"
-#include "utils.h"
 #include "buffer.h"
-#include "lock.h"
-#include "wininc.h"
-#include "args.h"
 #include "jpeg.h"
 
 #include "ReadImage.hpp"
 #include <iostream>
-
-extern Args args;
+#include <wiringPi.h>
+#include <chrono>
+#include <thread>
 
 #ifndef INADDR_NONE
 #define INADDR_NONE 0xffffffff
@@ -57,10 +54,6 @@ int iPort = 0;
 
 char STREAMEOL[3] = {'\r','\n',0};
 #define WRITE write
-
-std::string strLiveFile = "/dev/shm/live.jpg";
-std::string strTestFile = "/dev/shm/test.jpg";
-std::string strServFile;
 
 void
 TCPGetDate(char *achTemp)
@@ -115,41 +108,6 @@ TCPSendMJPEGHeaders(Buffer &b)
 
 //2016-12-12 12-12-12-000
 #define TS_LEN 23
-//extern CRITICAL_SECTION csLive;
-//extern CRITICAL_SECTION csRec;
-
-/*bool
-GetUpdatedImage(std::string &strFile, std::string &strLast, Buffer &buffer)
-{
-	if (!access(strFile.c_str(), 0))
-	{
-		buffer.reset();
-		EnterCriticalSection(&csLive);
-		LockAndReadFile(strFile.c_str(), buffer);
-		LeaveCriticalSection(&csLive);
-		char achTS[30];
-		memcpy(achTS, buffer.getData(), TS_LEN);
-		achTS[TS_LEN] = 0;
-		if (strcmp(achTS, strLast.c_str()))
-		{
-			buffer.consume(TS_LEN);
-			if ((args.getIntOption("sw") != -1) || (args.getIntOption("sh") != -1))
-			{
-				CVSimpleResizeJpeg(buffer, args.getIntOption("sw"), args.getIntOption("sh"), 0);
-			}
-			strLast = achTS;
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	else
-	{
-		return false;
-	}
-}*/
 
 int
 SendStreamHeader(Buffer &b)
@@ -203,13 +161,11 @@ img_server()
 	int i;
 	struct client_t clients[MAXCLIENTS];
 
-	DWORD dwNow,dwLast,dwDiff;
+	uint32_t dwNow,dwLast,dwDiff;
 
 	dwNow = 0;
 	dwLast = 0;
-	dwDiff = 50.0;//0;
-	if (args.getIntOption("sr") != -1)
-		dwDiff = (DWORD)(1000.0/(float)atof(args.getOption("sr")));
+	dwDiff = 50;
 
 	/* reset all of the client structures */
 	for (i = 0; i < MAXCLIENTS; i++)
@@ -386,13 +342,13 @@ img_server()
 			}
 		}
 
-		dwNow = GetTickCount();
+		dwNow = millis();
 		if ((dwNow - dwLast) >= dwDiff)
 		{
 			if (getImageBuffer(buffer))
 			{
 				//std::cout << "Got image!" << std::endl;
-				dwLast = GetTickCount();
+				dwLast = millis();
 				for (i = 0; i < MAXCLIENTS; i++)
 				{
 					if (clients[i].inuse)
@@ -408,7 +364,7 @@ img_server()
 			}
 			else
 			{
-				Sleep(1);
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
 			}
 		}
 	}
@@ -429,7 +385,6 @@ void
 StartImageServer(int iPort_)
 {
 	iPort = iPort_;
-	strServFile = strLiveFile;
 	StartThread(thServer, (void *)server_thread, (void *)0);
 }
 
@@ -447,7 +402,6 @@ void
 StartTestImageServer(int iPort_)
 {
 	iPort = iPort_;
-	strServFile = strTestFile;
 	StartThread(thServer, (void *)server_thread, (void *)0);
 }
 

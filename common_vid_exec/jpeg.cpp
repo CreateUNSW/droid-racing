@@ -1,12 +1,9 @@
 // jpeg.cpp
 #include <stdio.h>
-#include "wininc.h"
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
 #include "jpeg.h"
-#include "utils.h"
-#include "lock.h"
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>

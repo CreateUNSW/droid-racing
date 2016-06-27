@@ -9,23 +9,6 @@
 using namespace std;
 using namespace cv;
 
-/**BEGIN Lloyd's global and external variables**/
-#define TS_LEN 23
-
-Args args;
-
-bool	bParentDied = false;
-bool	bTerminated = false;
-char	achConfig[1024];
-char	achConfigRoot[1024];
-extern	ProcStatus *pps;
-uint64_t procCount = 0;
-CRITICAL_SECTION csLive;
-CRITICAL_SECTION csRec;
-DWORD dwRec = 0x40;
-
-static string strTestFile = "/dev/shm/test.jpg";
-
 extern int InitSignal();
 
 extern void StartTestImageServer(int iPort_);
@@ -41,7 +24,6 @@ Buffer streamBuffer;
 */
 ReadStream::ReadStream(int argc, char **argv)
 {
-	outFile = strTestFile;
 	b = new Buffer;
 	start(argc, argv);
 }
@@ -52,19 +34,13 @@ ReadStream::ReadStream(int argc, char **argv)
 ReadStream::~ReadStream()
 {
 	cout << "destruct" << endl;
-	//DeleteCriticalSection(&csRec);
-	DeleteCriticalSection(&csLive);
 
 	StopTestImageServer();
 	delete b;
-
-	if (pps)
-		delete pps;
 }
 
 /**
 	Writes out modified Mat image to TCP stream handler.
-	Warning: very slow, uncomment if you wish to use
 */
 void ReadStream::writeStream(Mat img)
 {
@@ -99,67 +75,10 @@ bool getImageBuffer(Buffer & ret)
 }
 
 /**
-	Lloyd's function for termination
-*/
-bool handleInput(const char *ach, string &strResponse)
-{
-	if (!strcasecmp(ach, "stop"))
-	{
-		bTerminated = true;
-		return false;
-	}
-	else
-	{
-	}
-	return true;
-}
-
-/**
-	Another of Lloyd's functions for termination
-*/
-void sigterm(int signal, siginfo_t *siginfo, void *)
-{
-	bParentDied = true;
-}
-
-/**
-	Mostly Lloyd's code.
 	Start main image retrieving process
 */
 void ReadStream::start(int argc, char **argv)
 {
-	args.setOption("r", "rate", true, "-1");
-	args.setOption("iw", "image_width", true, "320");
-	args.setOption("ih", "image_height", true, "240");
-	args.setOption("p", "port", true, "8889");
-	args.setOption("sr", "streamrate", true, "25");
-	args.setOption("sw", "streamwidth", true, "-1");
-	args.setOption("sh", "streamheight", true, "-1");
-	args.setOption("i", "pidparent", true);
-
-	if (!args.parse(argc, argv))
-	{
-		args.usage();
-		exit(1);
-	}
-
-	InitSignal();
-	int sig;
-	prctl(PR_GET_PDEATHSIG, &sig);
-	struct sigaction act;
-	memset(&act, 0, sizeof(act));
-	act.sa_sigaction = sigterm;
-	act.sa_flags = SA_SIGINFO;
-	sigaction(sig, &act, 0);
-
-	const char *pchID = args.getOption("i");
-	if (pchID && *pchID)
-		pps->setPipes(true);
-
-	InitializeCriticalSectionAndSpinCount(&csLive, dwRec);
-	InitializeCriticalSectionAndSpinCount(&csRec, dwRec);
-
-	pps = new ProcStatus(StoppedForSomeReasonDefault, handleInput);
 
 	// Start image server on port
 	StartTestImageServer(CV_PORT);

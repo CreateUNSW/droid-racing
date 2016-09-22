@@ -2,8 +2,6 @@
 ## List of all cpp files
 CPP_FILES = $(wildcard src/*.cpp)
 CPP_FILES += $(wildcard common_vid_exec/*.cpp)
-empty=
-CPP_FILES := $(subst common_vid_exec/jpeglive.cpp,$(empty),$(CPP_FILES))
 
 ## Include directories
 INCL_DIRS = -I./include/ -I./common_vid_exec/

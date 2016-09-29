@@ -25,7 +25,6 @@ typedef int SOCKET;
 
 #include "thread.h"
 #include "buffer.h"
-#include "jpeg.h"
 
 #include "ReadImage.hpp"
 #include <iostream>

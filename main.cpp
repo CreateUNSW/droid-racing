@@ -108,7 +108,7 @@ int main(int argc, char * argv[])
 
 		// Convert to YMC and split
         cvtColor(imNewHsv, imNewYMC, COLOR_HSV2BGR);
-        split(imNewYCM, channels);
+        split(imNewYMC, channels);
 
 		// Extract Yellow and Magenta pseudo-intensity
         imYellow = channels.at(0)-(channels.at(1)+channels.at(2))/2;

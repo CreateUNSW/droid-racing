@@ -1,8 +1,0 @@
-#!/bin/bash
-
-# camera commands not available in OpenCV: set camera manual focus
-v4l2-ctl -c focus_auto=0
-v4l2-ctl -c focus_absolute=255
-
-# run main program
-sudo ./bin/run.exe

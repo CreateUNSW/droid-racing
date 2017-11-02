@@ -76,16 +76,20 @@ int main(int argc, char * argv[])
             }*/
         }
 
+		// Load next frame
         cam.retrieve(imLarge);
 
+		// Downsample frame
 		resize(imLarge, im, Size(iw,ih), 0, 0, CV_INTER_LINEAR);
         //im = imLarge;
         
+		// Split channels and define channel matrices
         split(im, channels);
         Mat imBlue = Mat::zeros(im.size(),CV_8UC1);
         Mat imYellow = Mat::zeros(im.size(),CV_8UC1);
         Mat imMagenta = Mat::zeros(im.size(),CV_8UC1);
         
+		// Get Blue pseudo-intensity
         imBlue = channels.at(0)-(channels.at(1)+channels.at(2))/2;
 
 		// convert image to HSV for processing
@@ -98,10 +102,15 @@ int main(int argc, char * argv[])
 			*it = (*it + 85) % 255;
 		}
 
-        Mat imNewHsv, imNewYCM;
+		// Merge rotated-hue HSV
+        Mat imNewHsv, imNewYMC;
         merge(channels, imNewHsv);
-        cvtColor(imNewHsv, imNewYCM, COLOR_HSV2BGR);
+
+		// Convert to YMC and split
+        cvtColor(imNewHsv, imNewYMC, COLOR_HSV2BGR);
         split(imNewYCM, channels);
+
+		// Extract Yellow and Magenta pseudo-intensity
         imYellow = channels.at(0)-(channels.at(1)+channels.at(2))/2;
         imMagenta = channels.at(1)-(channels.at(0)+channels.at(2))/2;
         
@@ -118,9 +127,12 @@ int main(int argc, char * argv[])
         Canny(imYellow, y_edge, 40, 120);
         Canny(imBlue, b_edge, 80, 120);
         Canny(imMagenta, m_edge, 60, 100);
+
+		// Combine all edges into a single mat
         //bitwise_or(y_edge, b_edge, edges);
         //bitwise_or(m_edge, edges, edges);
        
+		// NO LONGER USED - extract contours from canny output
         /*vector<vector<Point>> b_contours, y_contours;
         vector<Vec4i> b_hierarchy, y_hierarchy;
         findContours(y_edge, y_contours, y_hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
@@ -143,6 +155,7 @@ int main(int argc, char * argv[])
 
         int x1,x2,y1,y2;
 
+		// Extract lines from the edge mats using HoughLinesP algorithm
         vector<Vec4i> lines;
         int y_crop = 140;
         Scalar ln_colour;
